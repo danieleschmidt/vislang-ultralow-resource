@@ -91,4 +91,6 @@ trainer.train(
     eval_dataset=dataset["validation"],
     num_epochs=10,
     learning_rate=5e-5,
-    warmup_steps=
+    warmup_steps=1000,
+    gradient_checkpointing=True
+)
