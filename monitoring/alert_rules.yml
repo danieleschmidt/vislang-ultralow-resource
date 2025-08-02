@@ -1,0 +1,225 @@
+groups:
+  - name: vislang.availability
+    rules:
+    - alert: ApplicationDown
+      expr: up{job="vislang-app"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "VisLang application is down"
+        description: "The VisLang application ({{ $labels.instance }}) has been down for more than 1 minute."
+        runbook_url: "https://github.com/danieleschmidt/vislang-ultralow-resource/blob/main/docs/runbooks/application-down.md"
+
+    - alert: DatabaseDown
+      expr: up{job="postgres"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "PostgreSQL database is down"
+        description: "PostgreSQL database has been down for more than 2 minutes."
+
+    - alert: RedisDown
+      expr: up{job="redis"} == 0
+      for: 2m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Redis cache is down"
+        description: "Redis cache has been down for more than 2 minutes."
+
+  - name: vislang.performance
+    rules:
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.1
+      for: 3m
+      labels:
+        severity: warning
+        team: backend
+      annotations:
+        summary: "High error rate detected"
+        description: "Error rate is {{ $value | humanize }} errors per second for {{ $labels.endpoint }}."
+
+    - alert: HighLatency
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2.0
+      for: 5m
+      labels:
+        severity: warning
+        team: backend
+      annotations:
+        summary: "High request latency"
+        description: "95th percentile latency is {{ $value | humanizeDuration }} for {{ $labels.endpoint }}."
+
+    - alert: SlowModelInference
+      expr: histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m])) > 30
+      for: 3m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "Model inference is slow"
+        description: "95th percentile inference time is {{ $value | humanizeDuration }} for {{ $labels.model_name }}."
+
+    - alert: HighProcessingFailureRate
+      expr: rate(dataset_processing_total{status="failed"}[10m]) / rate(dataset_processing_total[10m]) > 0.15
+      for: 5m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "High processing failure rate"
+        description: "Processing failure rate is {{ $value | humanizePercentage }} for {{ $labels.source }} ({{ $labels.language }})."
+
+  - name: vislang.resources
+    rules:
+    - alert: HighMemoryUsage
+      expr: (memory_usage_bytes{component="application"} / 1024/1024/1024) > 3.5
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "High memory usage"
+        description: "Memory usage is {{ $value | humanize }}GB for {{ $labels.component }}."
+
+    - alert: HighCPUUsage
+      expr: rate(cpu_usage_seconds_total[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "High CPU usage"
+        description: "CPU usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}."
+
+    - alert: LowDiskSpace
+      expr: (disk_usage_bytes / disk_total_bytes) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Low disk space"
+        description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.mount_point }} ({{ $labels.instance }})."
+
+    - alert: CriticalDiskSpace
+      expr: (disk_usage_bytes / disk_total_bytes) > 0.95
+      for: 1m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Critical disk space"
+        description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.mount_point }} ({{ $labels.instance }})."
+
+  - name: vislang.database
+    rules:
+    - alert: DatabaseConnectionExhaustion
+      expr: (postgres_stat_activity_count / postgres_settings_max_connections) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Database connection pool nearly exhausted"
+        description: "Database connection pool is {{ $value | humanizePercentage }} full."
+
+    - alert: SlowDatabaseQueries
+      expr: rate(postgres_stat_activity_max_tx_duration[5m]) > 30
+      for: 3m
+      labels:
+        severity: warning
+        team: backend
+      annotations:
+        summary: "Slow database queries detected"
+        description: "Maximum transaction duration is {{ $value | humanizeDuration }}."
+
+    - alert: DatabaseLockWaits
+      expr: rate(postgres_stat_database_deadlocks[5m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        team: backend
+      annotations:
+        summary: "Database deadlocks detected"
+        description: "Database deadlock rate is {{ $value }} per second."
+
+  - name: vislang.cache
+    rules:
+    - alert: LowCacheHitRate
+      expr: rate(cache_operations_total{result="hit"}[10m]) / rate(cache_operations_total[10m]) < 0.7
+      for: 10m
+      labels:
+        severity: warning
+        team: backend
+      annotations:
+        summary: "Low cache hit rate"
+        description: "Cache hit rate is {{ $value | humanizePercentage }} for {{ $labels.cache_type }}."
+
+    - alert: HighRedisMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "High Redis memory usage"
+        description: "Redis memory usage is {{ $value | humanizePercentage }}."
+
+  - name: vislang.ml_pipeline
+    rules:
+    - alert: ModelLoadingFailure
+      expr: increase(model_loading_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        team: ml
+      annotations:
+        summary: "Model loading failure"
+        description: "Model {{ $labels.model_name }} failed to load {{ $value }} times in the last 5 minutes."
+
+    - alert: LowDataQuality
+      expr: avg_over_time(data_quality_score[15m]) < 0.8
+      for: 10m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "Low data quality score"
+        description: "Average data quality score is {{ $value | humanize }} for {{ $labels.dataset }} ({{ $labels.language }})."
+
+    - alert: ProcessingBacklog
+      expr: processing_queue_length > 1000
+      for: 15m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "Large processing backlog"
+        description: "Processing queue has {{ $value }} items waiting."
+
+  - name: vislang.business
+    rules:
+    - alert: LowProcessingThroughput
+      expr: rate(documents_processed_total[1h]) < 10
+      for: 30m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "Low document processing throughput"
+        description: "Document processing rate is {{ $value | humanize }} per hour for {{ $labels.source }}."
+
+    - alert: NoRecentProcessing
+      expr: (time() - last_processing_timestamp) > 3600
+      for: 5m
+      labels:
+        severity: warning
+        team: ml
+      annotations:
+        summary: "No recent document processing"
+        description: "No documents have been processed in the last hour."

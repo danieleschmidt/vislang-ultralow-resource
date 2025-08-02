@@ -1,0 +1,517 @@
+name: Dependency Management
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of updates to check'
+        required: false
+        type: choice
+        options:
+          - 'all'
+          - 'security'
+          - 'minor'
+          - 'major'
+        default: 'all'
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  check-dependencies:
+    name: Check for Dependency Updates
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      security_updates: ${{ steps.check.outputs.security_updates }}
+      minor_updates: ${{ steps.check.outputs.minor_updates }}
+      major_updates: ${{ steps.check.outputs.major_updates }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools pip-audit safety
+
+    - name: Check for security vulnerabilities
+      id: security
+      run: |
+        pip-audit --format=json --output=security-audit.json || true
+        if [ -s security-audit.json ]; then
+          echo "security_updates=true" >> $GITHUB_OUTPUT
+        else
+          echo "security_updates=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Check for outdated packages
+      id: outdated
+      run: |
+        pip list --outdated --format=json > outdated-packages.json
+        if [ -s outdated-packages.json ] && [ "$(cat outdated-packages.json)" != "[]" ]; then
+          echo "has_updates=true" >> $GITHUB_OUTPUT
+          
+          # Categorize updates by type
+          python << EOF
+        import json
+        import re
+        from packaging import version
+        
+        with open('outdated-packages.json', 'r') as f:
+            packages = json.load(f)
+        
+        minor_updates = []
+        major_updates = []
+        
+        for pkg in packages:
+            current = version.parse(pkg['version'])
+            latest = version.parse(pkg['latest_version'])
+            
+            if latest.major > current.major:
+                major_updates.append(pkg['name'])
+            elif latest.minor > current.minor:
+                minor_updates.append(pkg['name'])
+        
+        print(f"Minor updates: {minor_updates}")
+        print(f"Major updates: {major_updates}")
+        
+        with open('minor_updates.txt', 'w') as f:
+            f.write('\n'.join(minor_updates))
+        with open('major_updates.txt', 'w') as f:
+            f.write('\n'.join(major_updates))
+        EOF
+          
+          if [ -s minor_updates.txt ]; then
+            echo "minor_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "minor_updates=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -s major_updates.txt ]; then
+            echo "major_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "major_updates=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "has_updates=false" >> $GITHUB_OUTPUT
+          echo "minor_updates=false" >> $GITHUB_OUTPUT
+          echo "major_updates=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload audit reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-reports
+        path: |
+          security-audit.json
+          outdated-packages.json
+          minor_updates.txt
+          major_updates.txt
+
+    - name: Check result
+      id: check
+      run: |
+        echo "has_updates=${{ steps.outdated.outputs.has_updates }}" >> $GITHUB_OUTPUT
+        echo "security_updates=${{ steps.security.outputs.security_updates }}" >> $GITHUB_OUTPUT
+        echo "minor_updates=${{ steps.outdated.outputs.minor_updates }}" >> $GITHUB_OUTPUT
+        echo "major_updates=${{ steps.outdated.outputs.major_updates }}" >> $GITHUB_OUTPUT
+
+  security-updates:
+    name: Create Security Update PR
+    runs-on: ubuntu-latest
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.security_updates == 'true'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools pip-audit
+
+    - name: Download audit reports
+      uses: actions/download-artifact@v3
+      with:
+        name: dependency-reports
+
+    - name: Update security vulnerabilities
+      run: |
+        # Get list of vulnerable packages
+        python << EOF
+        import json
+        
+        with open('security-audit.json', 'r') as f:
+            audit = json.load(f)
+        
+        vulnerable_packages = []
+        for vuln in audit.get('vulnerabilities', []):
+            pkg_name = vuln['package']
+            if pkg_name not in vulnerable_packages:
+                vulnerable_packages.append(pkg_name)
+        
+        print(f"Updating vulnerable packages: {vulnerable_packages}")
+        
+        # Update each vulnerable package
+        for pkg in vulnerable_packages:
+            import subprocess
+            try:
+                subprocess.run(['pip', 'install', '--upgrade', pkg], check=True)
+            except subprocess.CalledProcessError:
+                print(f"Failed to update {pkg}")
+        EOF
+
+    - name: Generate updated requirements
+      run: |
+        pip freeze > requirements-updated.txt
+        diff requirements.txt requirements-updated.txt > requirements.diff || true
+
+    - name: Create security update PR
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "security: update vulnerable dependencies"
+        title: "🔒 Security: Update vulnerable dependencies"
+        body: |
+          ## Security Dependency Updates
+          
+          This PR updates dependencies with known security vulnerabilities.
+          
+          ### Vulnerabilities Fixed
+          ```
+          $(cat security-audit.json | jq -r '.vulnerabilities[] | "- \(.package): \(.id)"')
+          ```
+          
+          ### Changes
+          ```diff
+          $(cat requirements.diff)
+          ```
+          
+          **Auto-merge**: This PR will be automatically merged after CI passes.
+          
+          Generated by automated dependency update workflow.
+        branch: security/dependency-updates
+        delete-branch: true
+        assignees: ${{ github.actor }}
+        reviewers: ${{ github.actor }}
+        labels: |
+          security
+          dependencies
+          automated
+
+  minor-updates:
+    name: Create Minor Update PR
+    runs-on: ubuntu-latest
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.minor_updates == 'true' && (github.event.inputs.update_type == 'all' || github.event.inputs.update_type == 'minor')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools
+
+    - name: Download update lists
+      uses: actions/download-artifact@v3
+      with:
+        name: dependency-reports
+
+    - name: Update minor version packages
+      run: |
+        while IFS= read -r package; do
+          if [ -n "$package" ]; then
+            echo "Updating $package to latest minor version"
+            pip install --upgrade "$package"
+          fi
+        done < minor_updates.txt
+
+    - name: Generate updated requirements
+      run: |
+        pip freeze > requirements-updated.txt
+        diff requirements.txt requirements-updated.txt > requirements.diff || true
+
+    - name: Run tests to verify compatibility
+      run: |
+        pip install -e ".[dev]"
+        pytest tests/unit/ --tb=short
+        
+    - name: Create minor updates PR
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "deps: update dependencies to latest minor versions"
+        title: "⬆️ Update dependencies to latest minor versions"
+        body: |
+          ## Minor Dependency Updates
+          
+          This PR updates dependencies to their latest minor versions.
+          
+          ### Updated Packages
+          ```
+          $(cat minor_updates.txt)
+          ```
+          
+          ### Changes
+          ```diff
+          $(cat requirements.diff)
+          ```
+          
+          ### Testing
+          - ✅ Unit tests pass
+          - ⏳ Full CI will run on this PR
+          
+          **Review Required**: Please review these changes before merging.
+          
+          Generated by automated dependency update workflow.
+        branch: deps/minor-updates
+        delete-branch: true
+        assignees: ${{ github.actor }}
+        labels: |
+          dependencies
+          enhancement
+          automated
+
+  major-updates:
+    name: Create Major Update Issue
+    runs-on: ubuntu-latest
+    needs: check-dependencies
+    if: needs.check-dependencies.outputs.major_updates == 'true' && (github.event.inputs.update_type == 'all' || github.event.inputs.update_type == 'major')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download update lists
+      uses: actions/download-artifact@v3
+      with:
+        name: dependency-reports
+
+    - name: Create major updates issue
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const majorUpdates = fs.readFileSync('major_updates.txt', 'utf8').trim().split('\n').filter(line => line);
+          
+          const title = `📋 Major Dependency Updates Available`;
+          const body = `
+          ## Major Dependency Updates
+          
+          The following packages have major version updates available that require manual review:
+          
+          ${majorUpdates.map(pkg => `- [ ] \`${pkg}\``).join('\n')}
+          
+          ### Action Required
+          
+          For each package:
+          1. Review the changelog for breaking changes
+          2. Update code if necessary for compatibility
+          3. Test thoroughly before merging
+          4. Consider updating in separate PRs for easier review
+          
+          ### Links
+          ${majorUpdates.map(pkg => `- [${pkg} changelog](https://pypi.org/project/${pkg}/#history)`).join('\n')}
+          
+          ### Workflow
+          [Dependency Check Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          
+          **Priority**: Medium - Schedule for next sprint
+          `;
+          
+          // Check if issue already exists
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'dependencies,major-update',
+            state: 'open'
+          });
+          
+          if (issues.data.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['dependencies', 'major-update', 'enhancement']
+            });
+          } else {
+            // Update existing issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issues.data[0].number,
+              body: body
+            });
+          }
+
+  auto-merge-security:
+    name: Auto-merge Security Updates
+    runs-on: ubuntu-latest
+    needs: [security-updates]
+    if: needs.security-updates.result == 'success'
+    steps:
+    - name: Wait for CI
+      run: sleep 60  # Wait for CI to start
+
+    - name: Auto-merge security PR
+      uses: actions/github-script@v6
+      with:
+        script: |
+          // Find the security update PR
+          const prs = await github.rest.pulls.list({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            head: `${context.repo.owner}:security/dependency-updates`,
+            state: 'open'
+          });
+          
+          if (prs.data.length > 0) {
+            const pr = prs.data[0];
+            
+            // Wait for checks to complete
+            let attempts = 0;
+            const maxAttempts = 30; // Wait up to 15 minutes
+            
+            while (attempts < maxAttempts) {
+              const checks = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+              
+              const allChecksComplete = checks.data.check_runs.every(
+                check => check.status === 'completed'
+              );
+              
+              const allChecksPassed = checks.data.check_runs.every(
+                check => check.conclusion === 'success' || check.conclusion === 'neutral'
+              );
+              
+              if (allChecksComplete && allChecksPassed) {
+                // Enable auto-merge
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  commit_title: 'security: auto-merge vulnerability fixes',
+                  merge_method: 'squash'
+                });
+                
+                console.log(`Auto-merged security PR #${pr.number}`);
+                break;
+              }
+              
+              if (allChecksComplete && !allChecksPassed) {
+                console.log(`Security PR #${pr.number} has failing checks, not auto-merging`);
+                break;
+              }
+              
+              attempts++;
+              await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
+            }
+          }
+
+  dependency-summary:
+    name: Weekly Dependency Summary
+    runs-on: ubuntu-latest
+    needs: [check-dependencies, security-updates, minor-updates, major-updates]
+    if: always() && github.event_name == 'schedule'
+    steps:
+    - name: Generate summary
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const summary = `
+          ## 📊 Weekly Dependency Summary
+          
+          **Date**: ${new Date().toISOString().split('T')[0]}
+          
+          ### Status
+          - 🔒 Security Updates: ${{ needs.check-dependencies.outputs.security_updates == 'true' && '✅ Applied' || '✅ None needed' }}
+          - ⬆️ Minor Updates: ${{ needs.check-dependencies.outputs.minor_updates == 'true' && '📝 PR Created' || '✅ Up to date' }}
+          - 🚀 Major Updates: ${{ needs.check-dependencies.outputs.major_updates == 'true' && '📋 Issue Created' || '✅ None available' }}
+          
+          ### Actions Taken
+          ${needs.security-updates.result === 'success' ? '- Created security update PR' : ''}
+          ${needs.minor-updates.result === 'success' ? '- Created minor update PR' : ''}
+          ${needs.major-updates.result === 'success' ? '- Created major update tracking issue' : ''}
+          
+          ### Workflow
+          [Full Details](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          `;
+          
+          // Post to Slack if webhook is configured
+          // Could also create a GitHub issue or discussion
+          console.log(summary);
+
+  cleanup-old-prs:
+    name: Cleanup Old Dependency PRs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+    - name: Close stale dependency PRs
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          
+          // Get all open dependency PRs older than 30 days
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          
+          const prs = await github.rest.pulls.list({
+            owner,
+            repo,
+            state: 'open',
+            sort: 'created',
+            direction: 'asc'
+          });
+          
+          for (const pr of prs.data) {
+            const prDate = new Date(pr.created_at);
+            const hasDepLabel = pr.labels.some(label => 
+              label.name.includes('dependencies') || label.name.includes('deps')
+            );
+            
+            if (hasDepLabel && prDate < thirtyDaysAgo) {
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                state: 'closed'
+              });
+              
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: '🧹 Closing stale dependency PR. A new one will be created in the next scheduled run if updates are still available.'
+              });
+              
+              console.log(`Closed stale dependency PR #${pr.number}`);
+            }
+          }
