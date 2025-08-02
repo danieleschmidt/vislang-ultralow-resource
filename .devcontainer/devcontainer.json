@@ -1,0 +1,82 @@
+{
+  "name": "VisLang-UltraLow-Resource Development",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10-bullseye",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-python.mypy-type-checker",
+        "ms-toolsai.jupyter",
+        "GitHub.copilot",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "python.sortImports.provider": "isort",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/.mypy_cache": true,
+          "**/node_modules": true
+        }
+      }
+    }
+  },
+
+  "containerEnv": {
+    "PYTHONPATH": "/workspaces/vislang-ultralow-resource/src",
+    "CUDA_VISIBLE_DEVICES": "0"
+  },
+
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  "postCreateCommand": "pip install -e '.[dev]' && pre-commit install",
+
+  "postStartCommand": "echo 'VisLang-UltraLow-Resource development environment ready!' && python --version",
+
+  "remoteUser": "vscode",
+
+  "forwardPorts": [8888, 6006, 3000],
+
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter Lab",
+      "protocol": "http"
+    },
+    "6006": {
+      "label": "TensorBoard",
+      "protocol": "http"
+    },
+    "3000": {
+      "label": "Development Server",
+      "protocol": "http"
+    }
+  }
+}
