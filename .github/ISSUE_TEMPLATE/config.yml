@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/danieleschmidt/vislang-ultralow-resource/discussions
+    about: Ask questions, share ideas, and discuss with the community
+  - name: 🆘 Support
+    url: https://github.com/danieleschmidt/vislang-ultralow-resource/discussions/categories/q-a
+    about: Get help with using VisLang-UltraLow-Resource
+  - name: 🔒 Security Issues
+    url: https://github.com/danieleschmidt/vislang-ultralow-resource/security/advisories/new
+    about: Report security vulnerabilities privately

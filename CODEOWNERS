@@ -1,0 +1,49 @@
+# Global code owners
+* @danieleschmidt
+
+# Documentation
+*.md @danieleschmidt
+docs/ @danieleschmidt
+
+# Configuration files
+pyproject.toml @danieleschmidt
+requirements*.txt @danieleschmidt
+Dockerfile @danieleschmidt
+docker-compose*.yml @danieleschmidt
+.github/ @danieleschmidt
+
+# Core source code
+src/ @danieleschmidt
+
+# Testing
+tests/ @danieleschmidt
+pytest.ini @danieleschmidt
+.coverage @danieleschmidt
+
+# CI/CD and automation
+.github/workflows/ @danieleschmidt
+scripts/ @danieleschmidt
+
+# Security and compliance
+SECURITY.md @danieleschmidt
+.secrets.baseline @danieleschmidt
+
+# Monitoring and observability
+monitoring/ @danieleschmidt
+
+# Dependencies and package management
+requirements.txt @danieleschmidt
+pyproject.toml @danieleschmidt
+
+# Infrastructure
+Dockerfile @danieleschmidt
+docker-compose*.yml @danieleschmidt
+
+# Data and models (if applicable)
+# data/ @ml-team
+# models/ @ml-team
+
+# Legal and compliance
+LICENSE @danieleschmidt
+CODE_OF_CONDUCT.md @danieleschmidt
+CONTRIBUTING.md @danieleschmidt

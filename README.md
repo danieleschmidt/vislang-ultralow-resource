@@ -1,5 +1,12 @@
 # VisLang-UltraLow-Resource
 
+[![CI](https://github.com/danieleschmidt/vislang-ultralow-resource/workflows/CI/badge.svg)](https://github.com/danieleschmidt/vislang-ultralow-resource/actions)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](Dockerfile)
+
 Dataset builder and training framework for visual-language models in ultra-low-resource languages. Scrapes humanitarian reports, OCRs infographics, and creates aligned vision-language instruction datasets following the Masakhane visual-instruction corpus approach (2025).
 
 ## Overview
@@ -28,7 +35,7 @@ pip install vislang-ultralow-resource[ocr]
 pip install vislang-ultralow-resource[training]
 
 # Development installation
-git clone https://github.com/yourusername/vislang-ultralow-resource
+git clone https://github.com/danieleschmidt/vislang-ultralow-resource
 cd vislang-ultralow-resource
 pip install -e ".[dev]"
 ```
