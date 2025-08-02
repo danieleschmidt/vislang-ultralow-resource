@@ -1,0 +1,359 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install safety cyclonedx-bom
+
+    - name: Run Safety vulnerability check
+      run: |
+        safety check --json --output safety-report.json
+        safety check --short-report
+
+    - name: Generate SBOM
+      run: |
+        cyclonedx-py -o sbom.json
+        cyclonedx-py -o sbom.xml --format xml
+
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom-files
+        path: |
+          sbom.json
+          sbom.xml
+
+    - name: Snyk vulnerability scan
+      uses: snyk/actions/python@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --json-file-output=snyk-report.json
+
+    - name: Upload Snyk results to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: snyk.sarif
+
+  code-security-scan:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml] semgrep
+
+    - name: Run Bandit security analysis
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        bandit -r src/ -f sarif -o bandit.sarif
+        bandit -r src/
+
+    - name: Upload Bandit SARIF
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: bandit.sarif
+
+    - name: Run Semgrep security scan
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json src/
+        semgrep --config=auto --sarif --output=semgrep.sarif src/
+
+    - name: Upload Semgrep SARIF
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+
+    - name: Upload security scan reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-reports
+        path: |
+          bandit-report.json
+          semgrep-report.json
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install detect-secrets
+      run: pip install detect-secrets
+
+    - name: Run detect-secrets scan
+      run: |
+        detect-secrets scan --all-files --baseline .secrets.baseline
+        detect-secrets audit .secrets.baseline --report
+
+    - name: GitLeaks secret detection
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t vislang-security-scan:latest .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'vislang-security-scan:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Grype vulnerability scanner
+      uses: anchore/scan-action@v3
+      with:
+        image: "vislang-security-scan:latest"
+        fail-build: true
+        severity-cutoff: high
+
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-licenses licensecheck
+
+    - name: Check licenses
+      run: |
+        pip-licenses --format=json --output-file=licenses.json
+        pip-licenses --format=csv --output-file=licenses.csv
+        pip-licenses
+
+    - name: License compatibility check
+      run: |
+        licensecheck --zero
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-reports
+        path: |
+          licenses.json
+          licenses.csv
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        config-file: ./.github/codeql/codeql-config.yml
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, code-security-scan, secret-scan, license-compliance, codeql-analysis]
+    if: always()
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Generate security summary
+      run: |
+        echo "# Security Scan Summary" > security-summary.md
+        echo "Generated: $(date)" >> security-summary.md
+        echo "" >> security-summary.md
+        
+        # Check if any security jobs failed
+        if [[ "${{ needs.dependency-scan.result }}" == "failure" ]]; then
+          echo "❌ Dependency scan failed" >> security-summary.md
+        else
+          echo "✅ Dependency scan passed" >> security-summary.md
+        fi
+        
+        if [[ "${{ needs.code-security-scan.result }}" == "failure" ]]; then
+          echo "❌ Code security scan failed" >> security-summary.md
+        else
+          echo "✅ Code security scan passed" >> security-summary.md
+        fi
+        
+        if [[ "${{ needs.secret-scan.result }}" == "failure" ]]; then
+          echo "❌ Secret detection failed" >> security-summary.md
+        else
+          echo "✅ Secret detection passed" >> security-summary.md
+        fi
+        
+        if [[ "${{ needs.license-compliance.result }}" == "failure" ]]; then
+          echo "❌ License compliance failed" >> security-summary.md
+        else
+          echo "✅ License compliance passed" >> security-summary.md
+        fi
+        
+        if [[ "${{ needs.codeql-analysis.result }}" == "failure" ]]; then
+          echo "❌ CodeQL analysis failed" >> security-summary.md
+        else
+          echo "✅ CodeQL analysis passed" >> security-summary.md
+        fi
+
+    - name: Upload security summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-summary
+        path: security-summary.md
+
+    - name: Comment security summary on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('security-summary.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+
+  create-security-issue:
+    name: Create Security Issue
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, code-security-scan, secret-scan, codeql-analysis]
+    if: failure() && (github.event_name == 'schedule' || github.ref == 'refs/heads/main')
+    steps:
+    - name: Create security issue
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = `🚨 Security Scan Failure - ${new Date().toISOString().split('T')[0]}`;
+          const body = `
+          ## Security Scan Failure
+          
+          One or more security scans have failed in the scheduled security check.
+          
+          **Workflow Run**: [${context.runId}](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          **Commit**: ${context.sha}
+          **Branch**: ${context.ref}
+          
+          ### Failed Jobs
+          - Dependency Scan: ${{ needs.dependency-scan.result }}
+          - Code Security Scan: ${{ needs.code-security-scan.result }}
+          - Secret Detection: ${{ needs.secret-scan.result }}
+          - CodeQL Analysis: ${{ needs.codeql-analysis.result }}
+          
+          ### Action Required
+          1. Review the workflow logs for details
+          2. Address any security vulnerabilities found
+          3. Re-run the security scans to verify fixes
+          4. Close this issue once resolved
+          
+          **Priority**: High
+          **Assignee**: Security team
+          `;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['security', 'bug', 'high-priority']
+          });
