@@ -1,0 +1,273 @@
+{
+  "project_name": "VisLang-UltraLow-Resource",
+  "description": "Dataset builder and training framework for visual-language models in ultra-low-resource languages",
+  "metrics_version": "1.0.0",
+  "last_updated": "2025-01-15T00:00:00Z",
+  
+  "repository_metrics": {
+    "health_score": {
+      "overall": 0,
+      "documentation": 0,
+      "testing": 0,
+      "security": 0,
+      "maintenance": 0
+    },
+    "activity": {
+      "commits_last_30_days": 0,
+      "prs_last_30_days": 0,
+      "issues_last_30_days": 0,
+      "contributors_last_30_days": 0,
+      "average_time_to_merge": 0,
+      "average_time_to_close_issue": 0
+    },
+    "quality": {
+      "test_coverage_percentage": 0,
+      "code_quality_score": 0,
+      "technical_debt_ratio": 0,
+      "duplicated_lines_percentage": 0,
+      "security_hotspots": 0,
+      "vulnerability_count": 0
+    },
+    "performance": {
+      "build_success_rate": 0,
+      "average_build_time_seconds": 0,
+      "deployment_frequency": 0,
+      "lead_time_for_changes": 0,
+      "time_to_restore_service": 0,
+      "change_failure_rate": 0
+    }
+  },
+
+  "application_metrics": {
+    "processing": {
+      "documents_processed_total": 0,
+      "documents_processed_last_24h": 0,
+      "processing_success_rate": 0,
+      "average_processing_time_seconds": 0,
+      "failed_processing_count": 0,
+      "retry_count": 0
+    },
+    "ml_metrics": {
+      "models_loaded": 0,
+      "inference_requests_total": 0,
+      "inference_success_rate": 0,
+      "average_inference_time_ms": 0,
+      "model_accuracy_scores": {},
+      "training_jobs_completed": 0,
+      "datasets_created": 0
+    },
+    "data_quality": {
+      "high_quality_samples_percentage": 0,
+      "ocr_accuracy_by_language": {},
+      "annotation_agreement_score": 0,
+      "data_validation_pass_rate": 0,
+      "duplicate_detection_count": 0
+    },
+    "api_metrics": {
+      "total_requests": 0,
+      "requests_last_24h": 0,
+      "average_response_time_ms": 0,
+      "error_rate_percentage": 0,
+      "p95_response_time_ms": 0,
+      "p99_response_time_ms": 0,
+      "active_users": 0
+    }
+  },
+
+  "business_metrics": {
+    "impact": {
+      "languages_supported": 0,
+      "organizations_using": 0,
+      "humanitarian_reports_processed": 0,
+      "models_trained": 0,
+      "datasets_published": 0,
+      "research_citations": 0
+    },
+    "usage": {
+      "weekly_active_users": 0,
+      "monthly_active_users": 0,
+      "data_processed_gb": 0,
+      "api_calls_per_day": 0,
+      "downloads_total": 0,
+      "geographic_distribution": {}
+    },
+    "growth": {
+      "user_growth_rate": 0,
+      "usage_growth_rate": 0,
+      "feature_adoption_rate": 0,
+      "community_contributions": 0,
+      "stars_github": 0,
+      "forks_github": 0
+    }
+  },
+
+  "infrastructure_metrics": {
+    "availability": {
+      "uptime_percentage": 0,
+      "mttr_minutes": 0,
+      "mtbf_hours": 0,
+      "incident_count": 0,
+      "sla_compliance_percentage": 0
+    },
+    "performance": {
+      "cpu_utilization_percentage": 0,
+      "memory_utilization_percentage": 0,
+      "disk_utilization_percentage": 0,
+      "network_throughput_mbps": 0,
+      "database_query_time_avg": 0,
+      "cache_hit_rate_percentage": 0
+    },
+    "costs": {
+      "monthly_cloud_cost_usd": 0,
+      "cost_per_request": 0,
+      "cost_per_user": 0,
+      "cost_optimization_savings": 0,
+      "gpu_hours_used": 0,
+      "storage_cost_gb": 0
+    }
+  },
+
+  "security_metrics": {
+    "vulnerability_management": {
+      "critical_vulnerabilities": 0,
+      "high_vulnerabilities": 0,
+      "medium_vulnerabilities": 0,
+      "low_vulnerabilities": 0,
+      "time_to_patch_critical_hours": 0,
+      "security_scan_frequency_days": 7
+    },
+    "compliance": {
+      "security_policy_compliance": 0,
+      "dependency_scan_pass_rate": 0,
+      "secret_detection_violations": 0,
+      "code_signing_coverage": 0,
+      "access_review_completion": 0
+    },
+    "incidents": {
+      "security_incidents_count": 0,
+      "data_breach_count": 0,
+      "unauthorized_access_attempts": 0,
+      "malware_detection_count": 0,
+      "incident_response_time_hours": 0
+    }
+  },
+
+  "quality_metrics": {
+    "code_quality": {
+      "code_coverage_percentage": 0,
+      "test_success_rate": 0,
+      "static_analysis_score": 0,
+      "code_duplication_percentage": 0,
+      "maintainability_index": 0,
+      "cyclomatic_complexity": 0
+    },
+    "documentation": {
+      "api_documentation_coverage": 0,
+      "code_documentation_ratio": 0,
+      "outdated_documentation_pages": 0,
+      "documentation_feedback_score": 0,
+      "readme_quality_score": 0
+    },
+    "testing": {
+      "unit_test_count": 0,
+      "integration_test_count": 0,
+      "e2e_test_count": 0,
+      "test_execution_time_minutes": 0,
+      "flaky_test_count": 0,
+      "mutation_test_score": 0
+    }
+  },
+
+  "team_metrics": {
+    "productivity": {
+      "velocity_points_per_sprint": 0,
+      "cycle_time_days": 0,
+      "throughput_stories_per_week": 0,
+      "code_review_time_hours": 0,
+      "deployment_frequency_per_week": 0
+    },
+    "collaboration": {
+      "active_contributors": 0,
+      "pr_review_participation": 0,
+      "knowledge_sharing_sessions": 0,
+      "cross_team_contributions": 0,
+      "mentoring_relationships": 0
+    },
+    "satisfaction": {
+      "developer_satisfaction_score": 0,
+      "tool_satisfaction_score": 0,
+      "process_satisfaction_score": 0,
+      "work_life_balance_score": 0,
+      "learning_opportunities_score": 0
+    }
+  },
+
+  "collection_metadata": {
+    "data_sources": [
+      "github_api",
+      "prometheus_metrics",
+      "application_logs",
+      "database_queries",
+      "user_analytics",
+      "security_scanners",
+      "ci_cd_systems"
+    ],
+    "collection_frequency": {
+      "real_time": ["api_metrics", "performance_metrics"],
+      "hourly": ["processing_metrics", "quality_metrics"],
+      "daily": ["business_metrics", "security_metrics"],
+      "weekly": ["team_metrics", "repository_metrics"]
+    },
+    "retention_policy": {
+      "raw_data_days": 90,
+      "aggregated_data_days": 365,
+      "historical_summaries_years": 5
+    },
+    "data_quality": {
+      "completeness_percentage": 0,
+      "accuracy_percentage": 0,
+      "timeliness_percentage": 0,
+      "consistency_percentage": 0
+    }
+  },
+
+  "alerts_and_thresholds": {
+    "critical_thresholds": {
+      "error_rate_percentage": 5.0,
+      "response_time_p95_ms": 2000,
+      "uptime_percentage": 99.0,
+      "critical_vulnerabilities": 0,
+      "test_coverage_percentage": 80.0
+    },
+    "warning_thresholds": {
+      "error_rate_percentage": 2.0,
+      "response_time_p95_ms": 1000,
+      "uptime_percentage": 99.5,
+      "high_vulnerabilities": 5,
+      "test_coverage_percentage": 85.0
+    },
+    "notification_channels": [
+      "slack_alerts",
+      "email_notifications",
+      "github_issues",
+      "dashboard_alerts"
+    ]
+  },
+
+  "goals_and_targets": {
+    "2025_q1": {
+      "test_coverage_target": 90,
+      "uptime_target": 99.9,
+      "response_time_target": 500,
+      "security_scan_frequency": 1,
+      "languages_supported": 5
+    },
+    "2025_annual": {
+      "user_growth_target": 1000,
+      "performance_improvement": 50,
+      "cost_reduction_target": 20,
+      "security_compliance": 100,
+      "developer_satisfaction": 8.5
+    }
+  }
+}
