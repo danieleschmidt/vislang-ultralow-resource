@@ -205,3 +205,115 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ============================================================================
+# VisLang-UltraLow-Resource Specific Ignores
+# ============================================================================
+
+# Data directories
+data/
+datasets/
+raw_data/
+processed_data/
+scraped_content/
+ocr_output/
+
+# Model files and checkpoints
+models/
+checkpoints/
+*.bin
+*.safetensors
+*.pth
+*.pt
+*.onnx
+*.h5
+*.pkl
+*.joblib
+
+# HuggingFace cache
+.cache/
+huggingface_cache/
+transformers_cache/
+
+# OCR temporary files
+tesseract_tmp/
+easyocr_tmp/
+paddleocr_tmp/
+
+# Training outputs
+runs/
+wandb/
+tensorboard_logs/
+logs/
+outputs/
+
+# Configuration overrides
+.env.local
+.env.production
+config_local.yaml
+config_override.json
+
+# Temporary processing files
+tmp/
+temp/
+.tmp/
+processing_*/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+.dockerignore
+
+# Kubernetes
+*.kubeconfig
+kube-config
+
+# Secrets and keys
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Large files that shouldn't be committed
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.dmg
+*.iso
+
+# GPU/CUDA temporary files
+*.cubin
+*.fatbin
+
+# Jupyter notebook outputs (optional - remove if you want to keep outputs)
+*.ipynb_checkpoints
