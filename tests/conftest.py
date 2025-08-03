@@ -12,6 +12,10 @@ from PIL import Image
 import numpy as np
 import torch
 from transformers import AutoProcessor, AutoTokenizer
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from redis import Redis
+from unittest.mock import patch
 
 
 @pytest.fixture(scope="session")
@@ -323,6 +327,111 @@ def real_model_for_integration():
         return {"model": model, "processor": processor}
     except Exception as e:
         pytest.skip(f"Could not load real model for integration tests: {e}")
+
+
+@pytest.fixture
+def mock_database_session():
+    """Create a mock database session for testing."""
+    from vislang_ultralow.database.models import Base
+    
+    # Create in-memory SQLite database
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    Base.metadata.create_all(engine)
+    
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = SessionLocal()
+    
+    yield session
+    
+    session.close()
+
+
+@pytest.fixture 
+def mock_redis():
+    """Create a mock Redis client for testing."""
+    redis_mock = Mock(spec=Redis)
+    redis_mock.ping.return_value = True
+    redis_mock.get.return_value = None
+    redis_mock.set.return_value = True
+    redis_mock.delete.return_value = 1
+    redis_mock.exists.return_value = False
+    redis_mock.expire.return_value = True
+    redis_mock.ttl.return_value = 3600
+    redis_mock.keys.return_value = []
+    redis_mock.mget.return_value = []
+    redis_mock.mset.return_value = True
+    redis_mock.incrby.return_value = 1
+    redis_mock.info.return_value = {
+        'used_memory_human': '1M',
+        'connected_clients': 1,
+        'total_commands_processed': 100,
+        'keyspace_hits': 50,
+        'keyspace_misses': 50
+    }
+    return redis_mock
+
+
+@pytest.fixture
+def sample_documents():
+    """Create sample document data for testing."""
+    return [
+        {
+            "url": "https://example.unhcr.org/report1.pdf",
+            "title": "UNHCR Global Report 2024",
+            "source": "unhcr",
+            "language": "en",
+            "content": "This is a comprehensive report on global refugee situations.",
+            "content_type": "pdf",
+            "word_count": 150,
+            "quality_score": 0.92,
+            "images": [
+                {
+                    "src": "https://example.com/chart1.png",
+                    "alt": "Refugee statistics chart",
+                    "width": 800,
+                    "height": 600,
+                    "page": 1
+                }
+            ]
+        },
+        {
+            "url": "https://example.who.int/health-report.pdf",
+            "title": "WHO Health Emergency Report",
+            "source": "who",
+            "language": "en",
+            "content": "Emergency health situation analysis and recommendations.",
+            "content_type": "pdf",
+            "word_count": 200,
+            "quality_score": 0.88,
+            "images": [
+                {
+                    "src": "https://example.com/map1.png",
+                    "alt": "Health emergency map",
+                    "width": 1000,
+                    "height": 700,
+                    "page": 2
+                }
+            ]
+        }
+    ]
+
+
+@pytest.fixture
+def sample_training_config():
+    """Create sample training configuration."""
+    return {
+        'model_name': 'facebook/mblip-mt0-xl',
+        'learning_rate': 5e-5,
+        'batch_size': 8,
+        'num_epochs': 3,
+        'warmup_steps': 100,
+        'weight_decay': 0.01,
+        'gradient_checkpointing': True,
+        'save_steps': 500,
+        'eval_steps': 250,
+        'logging_steps': 50,
+        'early_stopping_patience': 3
+    }
 
 
 # Helper functions for tests
