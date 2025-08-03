@@ -10,11 +10,12 @@ __email__ = "daniel@terragonlabs.ai"
 
 from .dataset import DatasetBuilder
 from .scraper import HumanitarianScraper
-from .trainer import VisionLanguageTrainer
+from .trainer import VisionLanguageTrainer, VisionLanguageDataset
 
 __all__ = [
     "DatasetBuilder",
     "HumanitarianScraper", 
     "VisionLanguageTrainer",
+    "VisionLanguageDataset",
     "__version__",
 ]
