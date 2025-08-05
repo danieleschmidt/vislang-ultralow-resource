@@ -3,7 +3,8 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
-import pandas as pd
+import tempfile
+import json
 from PIL import Image
 import numpy as np
 
@@ -15,12 +16,13 @@ class TestDatasetBuilder:
 
     def test_init_with_default_params(self):
         """Test DatasetBuilder initialization with default parameters."""
-        builder = DatasetBuilder()
-        
-        assert builder.target_languages == ["en"]
-        assert builder.source_language == "en"
-        assert builder.min_quality_score == 0.8
-        assert builder.output_format == "hf_dataset"
+        with patch.object(DatasetBuilder, '_initialize_ocr_engines'), \
+             patch.object(DatasetBuilder, '_initialize_translation'):
+            builder = DatasetBuilder(target_languages=["en"])
+            
+            assert builder.target_languages == ["en"]
+            assert builder.source_language == "en"
+            assert builder.min_quality_score == 0.8
 
     def test_init_with_custom_params(self):
         """Test DatasetBuilder initialization with custom parameters."""

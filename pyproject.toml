@@ -47,6 +47,18 @@ dependencies = [
     "pandas>=1.5.0",
     "numpy>=1.21.0",
     "tqdm>=4.64.0",
+    "sqlalchemy>=1.4.0",
+    "psycopg2-binary>=2.9.0",
+    "redis>=4.0.0",
+    "click>=8.0.0",
+    "fastapi>=0.88.0",
+    "uvicorn[standard]>=0.20.0",
+    "python-multipart>=0.0.5",
+    "opencv-python>=4.6.0",
+    "PyMuPDF>=1.20.0",
+    "scikit-learn>=1.1.0",
+    "accelerate>=0.15.0",
+    "evaluate>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -81,11 +93,14 @@ all = [
     "vislang-ultralow-resource[ocr,training,dev]"
 ]
 
+[project.scripts]
+vislang = "vislang_ultralow.cli:cli"
+
 [project.urls]
-Homepage = "https://github.com/yourusername/vislang-ultralow-resource"
-Documentation = "https://github.com/yourusername/vislang-ultralow-resource#readme"
-Repository = "https://github.com/yourusername/vislang-ultralow-resource.git"
-"Bug Tracker" = "https://github.com/yourusername/vislang-ultralow-resource/issues"
+Homepage = "https://github.com/danieleschmidt/quantum-inspired-task-planner"
+Documentation = "https://github.com/danieleschmidt/quantum-inspired-task-planner#readme"
+Repository = "https://github.com/danieleschmidt/quantum-inspired-task-planner.git"
+"Bug Tracker" = "https://github.com/danieleschmidt/quantum-inspired-task-planner/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
