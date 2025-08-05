@@ -291,22 +291,24 @@ class DatasetBuilder:
         """Extract text from image using multiple OCR engines."""
         ocr_results = []
         
-        # For now, simulate OCR results since we don't have actual image data
-        # In real implementation, you would load the image and run OCR
+        # Load image from URL or local path
+        image = self._load_image(image_info)
+        if image is None:
+            return {'text': '', 'confidence': 0.0, 'engines': []}
         
-        # Simulate different OCR engine results
+        # Run different OCR engines
         if "tesseract" in self.ocr_processors:
-            result = self._simulate_tesseract_ocr(image_info)
+            result = self._run_tesseract_ocr(image)
             if result:
                 ocr_results.append(('tesseract', result))
         
         if "easyocr" in self.ocr_processors:
-            result = self._simulate_easyocr_ocr(image_info)
+            result = self._run_easyocr_ocr(image)
             if result:
                 ocr_results.append(('easyocr', result))
         
         if "paddleocr" in self.ocr_processors:
-            result = self._simulate_paddleocr_ocr(image_info)
+            result = self._run_paddleocr_ocr(image)
             if result:
                 ocr_results.append(('paddleocr', result))
         
@@ -316,30 +318,178 @@ class DatasetBuilder:
         # Consensus OCR result
         return self._consensus_ocr_result(ocr_results)
     
-    def _simulate_tesseract_ocr(self, image_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Simulate Tesseract OCR results."""
-        # This is a simulation - in real implementation, process actual image
-        return {
-            'text': f"Sample text extracted from {image_info.get('alt', 'image')}",
-            'confidence': random.uniform(0.7, 0.95),
-            'bbox': [[0, 0, 100, 20]]
-        }
+    def _load_image(self, image_info: Dict[str, Any]) -> Optional[Image.Image]:
+        """Load image from URL or local path."""
+        try:
+            src = image_info.get('src', '')
+            if not src:
+                return None
+            
+            if src.startswith('http'):
+                # Download image from URL
+                import requests
+                response = requests.get(src, timeout=30)
+                response.raise_for_status()
+                image = Image.open(BytesIO(response.content))
+            else:
+                # Load from local path
+                image = Image.open(src)
+            
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            return image
+        except Exception as e:
+            logger.error(f"Failed to load image {image_info.get('src')}: {e}")
+            return None
     
-    def _simulate_easyocr_ocr(self, image_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Simulate EasyOCR results."""
-        return {
-            'text': f"EasyOCR text from {image_info.get('alt', 'image')}",
-            'confidence': random.uniform(0.75, 0.9),
-            'bbox': [[0, 0, 100, 20]]
-        }
+    def _run_tesseract_ocr(self, image: Image.Image) -> Optional[Dict[str, Any]]:
+        """Run Tesseract OCR on image."""
+        try:
+            # Convert PIL image to numpy array
+            img_array = np.array(image)
+            
+            # Extract text with confidence
+            config = self.ocr_processors["tesseract"]["config"]
+            data = pytesseract.image_to_data(img_array, config=config, output_type=pytesseract.Output.DICT)
+            
+            # Filter out low confidence detections
+            texts = []
+            confidences = []
+            bboxes = []
+            
+            n_boxes = len(data['text'])
+            for i in range(n_boxes):
+                conf = int(data['conf'][i])
+                text = data['text'][i].strip()
+                
+                if conf > 30 and text:  # Only include confident detections
+                    texts.append(text)
+                    confidences.append(conf / 100.0)  # Convert to 0-1 range
+                    bboxes.append([
+                        data['left'][i], data['top'][i],
+                        data['left'][i] + data['width'][i],
+                        data['top'][i] + data['height'][i]
+                    ])
+            
+            if not texts:
+                return None
+            
+            # Combine results
+            full_text = ' '.join(texts)
+            avg_confidence = np.mean(confidences) if confidences else 0.0
+            
+            return {
+                'text': full_text,
+                'confidence': avg_confidence,
+                'bbox': bboxes,
+                'word_confidences': confidences
+            }
+            
+        except Exception as e:
+            logger.error(f"Tesseract OCR failed: {e}")
+            return None
     
-    def _simulate_paddleocr_ocr(self, image_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Simulate PaddleOCR results."""
-        return {
-            'text': f"PaddleOCR text from {image_info.get('alt', 'image')}",
-            'confidence': random.uniform(0.8, 0.95),
-            'bbox': [[0, 0, 100, 20]]
-        }
+    def _run_easyocr_ocr(self, image: Image.Image) -> Optional[Dict[str, Any]]:
+        """Run EasyOCR on image."""
+        try:
+            if "easyocr" not in self.ocr_processors:
+                return None
+            
+            reader = self.ocr_processors["easyocr"]
+            img_array = np.array(image)
+            
+            # Run EasyOCR
+            results = reader.readtext(img_array)
+            
+            if not results:
+                return None
+            
+            texts = []
+            confidences = []
+            bboxes = []
+            
+            for (bbox, text, conf) in results:
+                if conf > 0.3 and text.strip():  # Filter low confidence
+                    texts.append(text.strip())
+                    confidences.append(conf)
+                    
+                    # Convert bbox format
+                    x_coords = [point[0] for point in bbox]
+                    y_coords = [point[1] for point in bbox]
+                    bboxes.append([
+                        min(x_coords), min(y_coords),
+                        max(x_coords), max(y_coords)
+                    ])
+            
+            if not texts:
+                return None
+            
+            full_text = ' '.join(texts)
+            avg_confidence = np.mean(confidences) if confidences else 0.0
+            
+            return {
+                'text': full_text,
+                'confidence': avg_confidence,
+                'bbox': bboxes,
+                'word_confidences': confidences
+            }
+            
+        except Exception as e:
+            logger.error(f"EasyOCR failed: {e}")
+            return None
+    
+    def _run_paddleocr_ocr(self, image: Image.Image) -> Optional[Dict[str, Any]]:
+        """Run PaddleOCR on image."""
+        try:
+            if "paddleocr" not in self.ocr_processors:
+                return None
+            
+            ocr = self.ocr_processors["paddleocr"]
+            img_array = np.array(image)
+            
+            # Run PaddleOCR
+            results = ocr.ocr(img_array, cls=True)
+            
+            if not results or not results[0]:
+                return None
+            
+            texts = []
+            confidences = []
+            bboxes = []
+            
+            for line in results[0]:
+                if line:
+                    bbox, (text, conf) = line
+                    if conf > 0.3 and text.strip():  # Filter low confidence
+                        texts.append(text.strip())
+                        confidences.append(conf)
+                        
+                        # Convert bbox format
+                        x_coords = [point[0] for point in bbox]
+                        y_coords = [point[1] for point in bbox]
+                        bboxes.append([
+                            min(x_coords), min(y_coords),
+                            max(x_coords), max(y_coords)
+                        ])
+            
+            if not texts:
+                return None
+            
+            full_text = ' '.join(texts)
+            avg_confidence = np.mean(confidences) if confidences else 0.0
+            
+            return {
+                'text': full_text,
+                'confidence': avg_confidence,
+                'bbox': bboxes,
+                'word_confidences': confidences
+            }
+            
+        except Exception as e:
+            logger.error(f"PaddleOCR failed: {e}")
+            return None
     
     def _consensus_ocr_result(self, ocr_results: List[Tuple[str, Dict[str, Any]]]) -> Dict[str, Any]:
         """Create consensus result from multiple OCR engines."""

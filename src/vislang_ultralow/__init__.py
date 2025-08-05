@@ -12,10 +12,12 @@ from .dataset import DatasetBuilder
 from .scraper import HumanitarianScraper
 from .trainer import VisionLanguageTrainer, VisionLanguageDataset
 from .database import (
-    DatabaseManager, get_session, Document, Image, DatasetItem, TrainingRun,
-    DocumentRepository, ImageRepository, DatasetRepository
+    DatabaseManager, get_session
 )
+from .database.models import Document, Image, DatasetItem, TrainingRun
+from .database.repositories import DocumentRepository, ImageRepository, DatasetRepository, TrainingRepository
 from .cache import CacheManager, get_cache_manager, cached, cache_key, invalidate_cache
+from .cli import cli
 
 __all__ = [
     "DatasetBuilder",
@@ -31,10 +33,12 @@ __all__ = [
     "DocumentRepository",
     "ImageRepository",
     "DatasetRepository",
+    "TrainingRepository",
     "CacheManager",
     "get_cache_manager",
     "cached",
     "cache_key",
     "invalidate_cache",
+    "cli",
     "__version__",
 ]

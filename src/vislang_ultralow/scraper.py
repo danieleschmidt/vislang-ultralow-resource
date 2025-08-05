@@ -15,6 +15,15 @@ from bs4 import BeautifulSoup
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import backoff
+from contextlib import contextmanager
+import tempfile
+import signal
+import psutil
+import os
+
+from .exceptions import ScrapingError, ValidationError, ResourceError, RateLimitError
+from .utils.validation import DataValidator
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +35,12 @@ class HumanitarianScraper:
         self,
         sources: List[str],
         languages: List[str],
-        date_range: Optional[Tuple[str, str]] = None
+        date_range: Optional[Tuple[str, str]] = None,
+        max_retries: int = 3,
+        timeout: int = 30,
+        respect_robots: bool = True,
+        user_agent: str = None,
+        max_workers: int = 5
     ):
         """Initialize humanitarian scraper.
         
@@ -34,21 +48,226 @@ class HumanitarianScraper:
             sources: List of source organizations ("unhcr", "who", "unicef", "wfp")
             languages: List of language codes to scrape
             date_range: Optional date range tuple (start, end) in YYYY-MM-DD format
+            max_retries: Maximum number of retry attempts
+            timeout: Request timeout in seconds
+            respect_robots: Whether to respect robots.txt
+            user_agent: Custom user agent string
+            max_workers: Maximum concurrent workers
         """
         self.sources = sources
         self.languages = languages
         self.date_range = date_range
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self.respect_robots = respect_robots
+        self.max_workers = max_workers
         
         # Validate sources
         valid_sources = {"unhcr", "who", "unicef", "wfp", "ocha", "undp"}
         invalid_sources = set(sources) - valid_sources
         if invalid_sources:
-            raise ValueError(f"Invalid sources: {invalid_sources}")
+            raise ValidationError(f"Invalid sources: {invalid_sources}")
         
-        logger.info(f"Initialized scraper for sources: {sources}, languages: {languages}")
+        # Initialize validator
+        self.validator = DataValidator(strict_mode=False)
+        
+        # Set user agent
+        self.user_agent = user_agent or (
+            "VisLang-UltraLow-Resource/1.0 "
+            "(https://github.com/danieleschmidt/quantum-inspired-task-planner; "
+            "humanitarian-research@terragonlabs.ai)"
+        )
+        
+        # Rate limiting configuration
+        self.rate_limits = {
+            "unhcr": {"requests_per_minute": 30, "burst": 5},
+            "who": {"requests_per_minute": 20, "burst": 3},
+            "unicef": {"requests_per_minute": 25, "burst": 4},
+            "wfp": {"requests_per_minute": 20, "burst": 3},
+            "ocha": {"requests_per_minute": 15, "burst": 2},
+            "undp": {"requests_per_minute": 20, "burst": 3}
+        }
+        
+        # Track request times for rate limiting
+        self.request_times = {source: [] for source in sources}
+        
+        # Performance monitoring
+        self.stats = {
+            'requests_made': 0,
+            'requests_failed': 0,
+            'documents_extracted': 0,
+            'cache_hits': 0,
+            'rate_limit_delays': 0,
+            'start_time': None
+        }
+        
+        logger.info(f"Initialized robust scraper for sources: {sources}, languages: {languages}")
+        logger.info(f"Configuration: max_retries={max_retries}, timeout={timeout}s, max_workers={max_workers}")
+    
+    @contextmanager
+    def _resource_monitor(self):
+        """Context manager to monitor resource usage during scraping."""
+        process = psutil.Process(os.getpid())
+        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        
+        try:
+            # Check available resources
+            if not self.validator.validate_system_resources(min_memory_gb=2.0, min_disk_gb=5.0):
+                raise ResourceError("Insufficient system resources for scraping")
+            
+            yield
+            
+        finally:
+            final_memory = process.memory_info().rss / 1024 / 1024  # MB
+            memory_used = final_memory - initial_memory
+            
+            if memory_used > 500:  # More than 500MB used
+                logger.warning(f"High memory usage during scraping: {memory_used:.1f}MB")
+    
+    def _setup_session(self) -> requests.Session:
+        """Set up HTTP session with robust configuration."""
+        session = requests.Session()
+        
+        # Set headers
+        session.headers.update({
+            'User-Agent': self.user_agent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        })
+        
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=self.max_retries,
+            status_forcelist=[429, 500, 502, 503, 504, 522, 524],
+            method_whitelist=["HEAD", "GET", "OPTIONS"],
+            backoff_factor=2,  # Exponential backoff
+            raise_on_status=False
+        )
+        
+        # Mount adapters
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=self.max_workers,
+            pool_maxsize=self.max_workers * 2
+        )
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
+    
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.RequestException, ConnectionError, TimeoutError),
+        max_tries=3,
+        max_time=300
+    )
+    def _make_request(self, url: str, source: str) -> requests.Response:
+        """Make HTTP request with rate limiting and error handling.
+        
+        Args:
+            url: URL to request
+            source: Source organization for rate limiting
+            
+        Returns:
+            HTTP response
+            
+        Raises:
+            ScrapingError: If request fails after retries
+            RateLimitError: If rate limited
+        """
+        # Check rate limits
+        self._enforce_rate_limit(source)
+        
+        try:
+            self.stats['requests_made'] += 1
+            
+            response = self.session.get(
+                url,
+                timeout=self.timeout,
+                allow_redirects=True,
+                stream=False  # Don't stream for small documents
+            )
+            
+            # Check for rate limiting
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', 60))
+                self.stats['rate_limit_delays'] += 1
+                raise RateLimitError(f"Rate limited by {source}", retry_after=retry_after)
+            
+            # Check response status
+            response.raise_for_status()
+            
+            # Validate response size
+            content_length = response.headers.get('content-length', 0)
+            if content_length and int(content_length) > 100 * 1024 * 1024:  # 100MB limit
+                raise ScrapingError(f"Response too large: {content_length} bytes", source=source, url=url)
+            
+            return response
+            
+        except requests.exceptions.Timeout:
+            self.stats['requests_failed'] += 1
+            raise ScrapingError(f"Request timeout after {self.timeout}s", source=source, url=url)
+        
+        except requests.exceptions.ConnectionError as e:
+            self.stats['requests_failed'] += 1
+            raise ScrapingError(f"Connection error: {str(e)}", source=source, url=url)
+        
+        except requests.exceptions.HTTPError as e:
+            self.stats['requests_failed'] += 1
+            if response.status_code == 404:
+                logger.warning(f"Document not found: {url}")
+                return None
+            elif response.status_code == 403:
+                raise ScrapingError(f"Access forbidden: {url}", source=source, url=url)
+            else:
+                raise ScrapingError(f"HTTP error {response.status_code}: {str(e)}", source=source, url=url)
+        
+        except Exception as e:
+            self.stats['requests_failed'] += 1
+            raise ScrapingError(f"Unexpected error: {str(e)}", source=source, url=url)
+    
+    def _enforce_rate_limit(self, source: str) -> None:
+        """Enforce rate limiting for source.
+        
+        Args:
+            source: Source organization
+            
+        Raises:
+            RateLimitError: If rate limit would be exceeded
+        """
+        if source not in self.rate_limits:
+            return
+        
+        config = self.rate_limits[source]
+        now = time.time()
+        
+        # Clean old requests (older than 1 minute)
+        self.request_times[source] = [
+            t for t in self.request_times[source] 
+            if now - t < 60
+        ]
+        
+        recent_requests = len(self.request_times[source])
+        max_requests = config['requests_per_minute']
+        
+        if recent_requests >= max_requests:
+            # Calculate delay needed
+            oldest_request = min(self.request_times[source])
+            delay = 60 - (now - oldest_request)
+            
+            if delay > 0:
+                logger.info(f"Rate limiting {source}: waiting {delay:.1f}s")
+                time.sleep(delay)
+                self.stats['rate_limit_delays'] += 1
+        
+        # Record this request
+        self.request_times[source].append(now)
     
     def scrape(self, cache_dir: Optional[Path] = None, max_docs: Optional[int] = None) -> List[Dict[str, any]]:
-        """Scrape humanitarian reports.
+        """Scrape humanitarian reports with robust error handling.
         
         Args:
             cache_dir: Directory to cache downloaded files
@@ -56,36 +275,216 @@ class HumanitarianScraper:
         
         Returns:
             List of scraped document metadata and content
+            
+        Raises:
+            ScrapingError: If critical scraping error occurs
+            ResourceError: If insufficient system resources
         """
-        logger.info("Starting humanitarian report scraping")
+        self.stats['start_time'] = datetime.now()
+        logger.info("Starting robust humanitarian report scraping")
         
-        self.cache_dir = cache_dir or Path("./cache")
-        self.cache_dir.mkdir(exist_ok=True)
+        try:
+            with self._resource_monitor():
+                # Setup cache directory
+                self.cache_dir = cache_dir or Path("./cache")
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Validate cache directory permissions
+                if not os.access(self.cache_dir, os.W_OK):
+                    raise ScrapingError(f"Cannot write to cache directory: {self.cache_dir}")
+                
+                # Initialize HTTP session
+                self.session = self._setup_session()
+                
+                documents = []
+                failed_sources = []
+                
+                # Process each source with error isolation
+                for source in self.sources:
+                    try:
+                        logger.info(f"Processing source: {source}")
+                        source_docs = self._scrape_source_robust(source, max_docs)
+                        documents.extend(source_docs)
+                        
+                        logger.info(f"Successfully scraped {len(source_docs)} documents from {source}")
+                        
+                    except ScrapingError as e:
+                        logger.error(f"Scraping error for {source}: {e}")
+                        failed_sources.append(source)
+                        
+                        # Continue with other sources unless all are failing
+                        if len(failed_sources) >= len(self.sources):
+                            raise ScrapingError("All sources failed to scrape")
+                        
+                    except Exception as e:
+                        logger.error(f"Unexpected error scraping {source}: {e}")
+                        failed_sources.append(source)
+                        continue
+                
+                # Validate results
+                if not documents:
+                    raise ScrapingError("No documents were successfully scraped from any source")
+                
+                # Validate document quality
+                valid_documents = []
+                for doc in documents:
+                    try:
+                        if self.validator.validate_document(doc):
+                            valid_documents.append(doc)
+                            self.stats['documents_extracted'] += 1
+                        else:
+                            logger.debug(f"Document validation failed: {doc.get('url')}")
+                    except Exception as e:
+                        logger.warning(f"Error validating document: {e}")
+                
+                # Final quality check
+                success_rate = len(valid_documents) / len(documents) if documents else 0
+                if success_rate < 0.1:  # Less than 10% success rate
+                    logger.warning(f"Low success rate: {success_rate:.1%}")
+                
+                duration = datetime.now() - self.stats['start_time']
+                logger.info(f"Scraping completed in {duration.total_seconds():.1f}s")
+                logger.info(f"Final results: {len(valid_documents)} valid documents, "
+                           f"{len(failed_sources)} failed sources")
+                
+                return valid_documents
+                
+        except KeyboardInterrupt:
+            logger.warning("Scraping interrupted by user")
+            raise
+        except (ResourceError, ScrapingError):
+            raise
+        except Exception as e:
+            logger.error(f"Critical scraping error: {e}")
+            raise ScrapingError(f"Critical scraping failure: {str(e)}")
+        finally:
+            # Cleanup
+            if hasattr(self, 'session'):
+                self.session.close()
+            
+            # Log final statistics
+            self._log_scraping_stats()
+    
+    def _scrape_source_robust(self, source: str, max_docs: Optional[int] = None) -> List[Dict[str, any]]:
+        """Scrape documents from specific source with robust error handling.
         
-        # Initialize HTTP session with retry strategy
-        self.session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "OPTIONS"],
-            backoff_factor=1
+        Args:
+            source: Source organization code
+            max_docs: Maximum documents to scrape
+            
+        Returns:
+            List of documents from source
+        """
+        logger.info(f"Starting robust scraping for source: {source}")
+        
+        # Source-specific scraping methods
+        scraper_methods = {
+            "unhcr": self._scrape_unhcr,
+            "who": self._scrape_who,
+            "unicef": self._scrape_unicef,
+            "wfp": self._scrape_wfp,
+            "ocha": self._scrape_ocha,
+            "undp": self._scrape_undp
+        }
+        
+        if source not in scraper_methods:
+            raise ScrapingError(f"No scraper implemented for source: {source}", source=source)
+        
+        try:
+            # Execute source-specific scraping with timeout
+            documents = scraper_methods[source](max_docs)
+            
+            # Filter by date range if specified
+            if self.date_range:
+                original_count = len(documents)
+                documents = self._filter_by_date(documents)
+                filtered_count = original_count - len(documents)
+                if filtered_count > 0:
+                    logger.info(f"Filtered {filtered_count} documents by date range")
+            
+            # Validate extracted documents
+            valid_documents = []
+            for doc in documents:
+                try:
+                    if self._validate_extracted_document(doc, source):
+                        valid_documents.append(doc)
+                except Exception as e:
+                    logger.debug(f"Document validation error: {e}")
+            
+            logger.info(f"Source {source}: {len(valid_documents)}/{len(documents)} documents passed validation")
+            return valid_documents
+            
+        except RateLimitError as e:
+            logger.warning(f"Rate limited by {source}, waiting {e.retry_after}s")
+            time.sleep(e.retry_after)
+            # Retry once after rate limit
+            return self._scrape_source_robust(source, max_docs)
+            
+        except ScrapingError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error scraping {source}: {e}")
+            raise ScrapingError(f"Unexpected error in {source}: {str(e)}", source=source)
+    
+    def _validate_extracted_document(self, doc: Dict[str, any], source: str) -> bool:
+        """Validate extracted document meets quality standards.
+        
+        Args:
+            doc: Document dictionary
+            source: Source organization
+            
+        Returns:
+            True if document is valid
+        """
+        if not doc:
+            return False
+        
+        # Required fields
+        required_fields = ['url', 'title', 'content', 'source', 'language']
+        for field in required_fields:
+            if field not in doc or not doc[field]:
+                logger.debug(f"Document missing required field: {field}")
+                return False
+        
+        # Content quality checks
+        content = doc.get('content', '')
+        if len(content.strip()) < 100:  # Minimum content length
+            logger.debug("Document content too short")
+            return False
+        
+        # Source consistency
+        if doc.get('source') != source:
+            logger.debug(f"Source mismatch: expected {source}, got {doc.get('source')}")
+            return False
+        
+        # Language validation
+        if doc.get('language') not in self.languages:
+            logger.debug(f"Document language {doc.get('language')} not in target languages")
+            return False
+        
+        return True
+    
+    def _log_scraping_stats(self) -> None:
+        """Log comprehensive scraping statistics."""
+        if not self.stats['start_time']:
+            return
+        
+        duration = datetime.now() - self.stats['start_time']
+        stats = self.stats.copy()
+        stats['duration_seconds'] = duration.total_seconds()
+        stats['success_rate'] = (
+            (stats['requests_made'] - stats['requests_failed']) / max(stats['requests_made'], 1)
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("http://", adapter)
-        self.session.mount("https://", adapter)
         
-        documents = []
-        for source in self.sources:
-            try:
-                source_docs = self._scrape_source(source, max_docs)
-                documents.extend(source_docs)
-                logger.info(f"Scraped {len(source_docs)} documents from {source}")
-            except Exception as e:
-                logger.error(f"Failed to scrape {source}: {e}")
-                continue
-        
-        logger.info(f"Total scraped {len(documents)} documents")
-        return documents
+        logger.info("=== Scraping Statistics ===")
+        logger.info(f"Duration: {duration.total_seconds():.1f}s")
+        logger.info(f"Requests made: {stats['requests_made']}")
+        logger.info(f"Requests failed: {stats['requests_failed']}")
+        logger.info(f"Success rate: {stats['success_rate']:.1%}")
+        logger.info(f"Documents extracted: {stats['documents_extracted']}")
+        logger.info(f"Cache hits: {stats['cache_hits']}")
+        logger.info(f"Rate limit delays: {stats['rate_limit_delays']}")
+        logger.info("==========================")
     
     def _scrape_source(self, source: str, max_docs: Optional[int] = None) -> List[Dict[str, any]]:
         """Scrape documents from specific source.
