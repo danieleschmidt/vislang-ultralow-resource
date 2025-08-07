@@ -49,9 +49,12 @@ class DatasetBuilder:
         self.output_dir = output_dir or Path("./datasets")
         self.output_dir.mkdir(exist_ok=True)
         
-        # Initialize OCR engines
+        # Initialize advanced OCR system with research innovations
         self.ocr_engines = ocr_engines or ["tesseract", "easyocr", "paddleocr"]
-        self._initialize_ocr_engines()
+        self.adaptive_ocr = AdaptiveMultiEngineOCR(self.ocr_engines)
+        
+        # Initialize cross-lingual alignment
+        self.cross_lingual_aligner = ZeroShotCrossLingual()
         
         # Initialize translation pipeline
         self._initialize_translation()
@@ -215,8 +218,8 @@ class DatasetBuilder:
                 ):
                     continue
                 
-                # Extract text from image using OCR
-                ocr_results = self._extract_text_from_image(image_info)
+                # Extract text from image using advanced adaptive OCR
+                ocr_results = self._extract_text_advanced(image_info, image_type)
                 
                 if not ocr_results or not ocr_results.get('text', '').strip():
                     continue
@@ -287,36 +290,33 @@ class DatasetBuilder:
         # Default classification
         return 'infographic'
     
-    def _extract_text_from_image(self, image_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract text from image using multiple OCR engines."""
-        ocr_results = []
-        
+    def _extract_text_advanced(self, image_info: Dict[str, Any], image_type: str) -> Dict[str, Any]:
+        """Extract text using advanced adaptive OCR with research innovations."""
         # Load image from URL or local path
         image = self._load_image(image_info)
         if image is None:
-            return {'text': '', 'confidence': 0.0, 'engines': []}
+            return {'text': '', 'confidence': 0.0, 'uncertainty': 1.0}
         
-        # Run different OCR engines
-        if "tesseract" in self.ocr_processors:
-            result = self._run_tesseract_ocr(image)
-            if result:
-                ocr_results.append(('tesseract', result))
+        # Use adaptive OCR system with document type awareness
+        document_type = self._map_image_type_to_document_type(image_type)
+        ocr_result = self.adaptive_ocr.extract_text(image, document_type)
         
-        if "easyocr" in self.ocr_processors:
-            result = self._run_easyocr_ocr(image)
-            if result:
-                ocr_results.append(('easyocr', result))
-        
-        if "paddleocr" in self.ocr_processors:
-            result = self._run_paddleocr_ocr(image)
-            if result:
-                ocr_results.append(('paddleocr', result))
-        
-        if not ocr_results:
-            return {'text': '', 'confidence': 0.0, 'engines': []}
-        
-        # Consensus OCR result
-        return self._consensus_ocr_result(ocr_results)
+        return ocr_result
+    
+    def _map_image_type_to_document_type(self, image_type: str) -> str:
+        """Map image classification to OCR document type."""
+        type_mapping = {
+            'chart': 'chart',
+            'infographic': 'infographic', 
+            'map': 'infographic',
+            'table': 'dense_text',
+            'document': 'standard'
+        }
+        return type_mapping.get(image_type, 'standard')
+    
+    def _extract_text_from_image(self, image_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Legacy method - kept for backward compatibility."""
+        return self._extract_text_advanced(image_info, 'standard')
     
     def _load_image(self, image_info: Dict[str, Any]) -> Optional[Image.Image]:
         """Load image from URL or local path."""

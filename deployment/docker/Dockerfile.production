@@ -1,0 +1,83 @@
+# Production Dockerfile for VisLang UltraLow Resource
+FROM python:3.11-slim AS base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    libpq-dev \
+    libmagic1 \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-fra \
+    tesseract-ocr-spa \
+    tesseract-ocr-ara \
+    libtesseract-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r vislang && useradd -r -g vislang vislang
+
+# Set work directory
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt requirements-prod.txt ./
+RUN pip install --no-cache-dir -r requirements-prod.txt
+
+# Copy application code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY monitoring/ ./monitoring/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/models /app/cache \
+    && chown -R vislang:vislang /app
+
+# Switch to non-root user
+USER vislang
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Start command
+CMD ["python", "-m", "uvicorn", "src.vislang_ultralow.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+
+
+# Multi-stage build for smaller production image
+FROM base AS production
+
+# Copy only what's needed for production
+COPY --from=base /app/src /app/src
+COPY --from=base /app/scripts /app/scripts
+COPY --from=base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Final production setup
+LABEL maintainer="daniel@terragonlabs.ai"
+LABEL version="0.1.0"
+LABEL description="VisLang UltraLow Resource - Production Container"
+
+# Security configurations
+RUN chown -R vislang:vislang /app && \
+    chmod -R 755 /app && \
+    find /app -type f -name "*.py" -exec chmod 644 {} \;
+
+USER vislang

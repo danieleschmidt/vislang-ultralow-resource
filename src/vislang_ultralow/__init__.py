@@ -18,6 +18,14 @@ from .database.models import Document, Image, DatasetItem, TrainingRun
 from .database.repositories import DocumentRepository, ImageRepository, DatasetRepository, TrainingRepository
 from .cache import CacheManager, get_cache_manager, cached, cache_key, invalidate_cache
 from .cli import cli
+from .research import (
+    AdaptiveMultiEngineOCR, OCRConsensusAlgorithm,
+    CrossLingualAlignmentModel, ZeroShotCrossLingual,
+    HumanitarianSceneAnalyzer, CrisisEventDetector,
+    AdaptiveModalFusion, UncertaintyAwareFusion,
+    LowResourceDataAugmentor, SyntheticDataGenerator,
+    HumanitarianVLBenchmark, CrossLingualEvaluator
+)
 
 __all__ = [
     "DatasetBuilder",
@@ -41,4 +49,17 @@ __all__ = [
     "invalidate_cache",
     "cli",
     "__version__",
+    # Research modules
+    "AdaptiveMultiEngineOCR",
+    "OCRConsensusAlgorithm", 
+    "CrossLingualAlignmentModel",
+    "ZeroShotCrossLingual",
+    "HumanitarianSceneAnalyzer",
+    "CrisisEventDetector",
+    "AdaptiveModalFusion",
+    "UncertaintyAwareFusion",
+    "LowResourceDataAugmentor",
+    "SyntheticDataGenerator",
+    "HumanitarianVLBenchmark",
+    "CrossLingualEvaluator"
 ]
