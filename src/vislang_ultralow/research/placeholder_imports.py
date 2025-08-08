@@ -137,7 +137,7 @@ except ImportError:
                 pass
             
             def ocr(self, image, cls=True):
-                return [[([[0, 0], [100, 0], [100, 50], [0, 50]], ("Sample text", 0.9))]]]
+                return [[([[0, 0], [100, 0], [100, 50], [0, 50]], ("Sample text", 0.9))]]
 
 try:
     from sentence_transformers import SentenceTransformer
