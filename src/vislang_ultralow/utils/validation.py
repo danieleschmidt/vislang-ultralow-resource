@@ -625,3 +625,103 @@ class QualityAssessment:
                    f"(avg quality: {np.mean(quality_scores):.3f})")
         
         return filtered_items
+
+
+def validate_document_security(document: Dict[str, Any], strict: bool = True) -> bool:
+    """Security validation for documents to prevent malicious content.
+    
+    Args:
+        document: Document dictionary to validate
+        strict: If True, applies strict security checks
+        
+    Returns:
+        True if document passes security validation
+        
+    Raises:
+        ValidationError: If security validation fails and strict=True
+    """
+    security_issues = []
+    
+    # Check for suspicious URLs
+    if 'url' in document:
+        url = document['url'].lower()
+        suspicious_patterns = [
+            'javascript:', 'data:', 'vbscript:', 'file:', 'ftp://',
+            '<script', '</script>', 'eval(', 'onclick=', 'onerror='
+        ]
+        
+        for pattern in suspicious_patterns:
+            if pattern in url:
+                security_issues.append(f"Suspicious URL pattern detected: {pattern}")
+                break
+    
+    # Check content for potential XSS/injection
+    if 'content' in document:
+        content = document['content'].lower()
+        dangerous_patterns = [
+            '<script', '</script>', 'javascript:', 'eval(',
+            '<iframe', '<embed', '<object', 'onclick=', 'onerror=',
+            'document.cookie', 'window.location', 'document.write'
+        ]
+        
+        for pattern in dangerous_patterns:
+            if pattern in content:
+                security_issues.append(f"Potentially dangerous content pattern: {pattern}")
+                
+    # Check for suspicious file paths
+    if 'images' in document:
+        for img in document['images']:
+            if 'src' in img:
+                src = img['src'].lower()
+                if any(path in src for path in ['../', '.\\', '/etc/', '/proc/', 'c:\\']):
+                    security_issues.append(f"Suspicious file path: {img['src']}")
+    
+    # Check metadata for suspicious entries
+    if 'document_metadata' in document:
+        metadata = str(document['document_metadata']).lower()
+        if any(pattern in metadata for pattern in ['<script', 'javascript:', 'eval(']):
+            security_issues.append("Suspicious patterns in metadata")
+    
+    # Size limits for DoS prevention
+    if 'content' in document and len(document['content']) > 10 * 1024 * 1024:  # 10MB
+        security_issues.append("Content exceeds maximum size limit")
+    
+    if security_issues:
+        error_msg = f"Security validation failed: {'; '.join(security_issues)}"
+        logger.warning(error_msg)
+        if strict:
+            raise ValidationError(error_msg)
+        return False
+    
+    return True
+
+
+def sanitize_input(text: str) -> str:
+    """Sanitize text input to prevent injection attacks.
+    
+    Args:
+        text: Input text to sanitize
+        
+    Returns:
+        Sanitized text
+    """
+    if not isinstance(text, str):
+        return str(text)
+    
+    # Remove dangerous HTML/script tags
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<[^>]+>', '', text)  # Remove all HTML tags
+    
+    # Remove potential JavaScript
+    text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'vbscript:', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'data:', '', text, flags=re.IGNORECASE)
+    
+    # Remove event handlers
+    text = re.sub(r'on\w+\s*=', '', text, flags=re.IGNORECASE)
+    
+    # Escape special characters
+    text = text.replace('<', '&lt;').replace('>', '&gt;')
+    text = text.replace('"', '&quot;').replace("'", '&#x27;')
+    
+    return text.strip()

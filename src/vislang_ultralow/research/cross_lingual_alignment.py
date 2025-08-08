@@ -13,7 +13,7 @@ import logging
 try:
     import numpy as np
 except ImportError:
-    from ..placeholder_imports import np
+    from .placeholder_imports import np
 
 try:
     import torch
@@ -25,12 +25,12 @@ except ImportError:
 try:
     from transformers import AutoModel, AutoTokenizer
 except ImportError:
-    from ..placeholder_imports import AutoModel, AutoTokenizer
+    from .placeholder_imports import AutoModel, AutoTokenizer
 
 try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
-    from ..placeholder_imports import SentenceTransformer
+    from .placeholder_imports import SentenceTransformer
 
 try:
     from sklearn.metrics.pairwise import cosine_similarity
