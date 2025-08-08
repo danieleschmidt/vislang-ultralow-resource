@@ -7,7 +7,8 @@ from sqlalchemy import (
     JSON, ForeignKey, Index, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.orm import relationship, validates
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON as JSONB  # Use JSON for SQLite compatibility
 import uuid
 from enum import Enum
 
@@ -74,7 +75,7 @@ class Document(Base):
     processing_status = Column(String(50), default="pending")
     
     # Additional metadata as JSON
-    metadata = Column(JSONB, default=dict)
+    document_metadata = Column(JSONB, default=dict)
     
     # Relationships
     images = relationship("Image", back_populates="document", cascade="all, delete-orphan")
@@ -273,7 +274,7 @@ class TrainingRun(Base):
     wandb_project = Column(String(100))
     
     # Additional metadata
-    metadata = Column(JSONB, default=dict)
+    training_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Indexes
