@@ -733,7 +733,7 @@ class HumanitarianScraper:
         # Record this request
         self.request_times[source].append(now)
     
-    def scrape(self, cache_dir: Optional[Path] = None, max_docs: Optional[int] = None) -> List[Dict[str, any]]:
+    def scrape_robust(self, cache_dir: Optional[Path] = None, max_docs: Optional[int] = None) -> List[Dict[str, any]]:
         """Scrape humanitarian reports with robust error handling.
         
         Args:

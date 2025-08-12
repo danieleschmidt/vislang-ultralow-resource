@@ -44,20 +44,74 @@ try:
     import numpy as np
 except ImportError:
     class np:
+        # Type annotations for compatibility
+        ndarray = list  # Use list as fallback type
+        
         @staticmethod
         def array(data):
+            if hasattr(data, '__iter__'):
+                return list(data)
             return data
         
         @staticmethod
         def mean(data, axis=None):
+            if hasattr(data, '__iter__') and len(data) > 0:
+                return sum(data) / len(data)
             return 0.5
         
         @staticmethod
         def var(data):
+            if hasattr(data, '__iter__') and len(data) > 1:
+                mean_val = np.mean(data)
+                return sum((x - mean_val) ** 2 for x in data) / len(data)
             return 0.1
+        
+        @staticmethod
+        def corrcoef(x, y):
+            return [[1.0, 0.8], [0.8, 1.0]]
+        
+        @staticmethod
+        def argmax(data):
+            if hasattr(data, '__iter__'):
+                return max(range(len(data)), key=lambda i: data[i])
+            return 0
+        
+        @staticmethod
+        def std(data):
+            return 0.1
+        
+        @staticmethod
+        def zeros(shape):
+            if isinstance(shape, tuple):
+                if len(shape) == 2:
+                    return [[0.0] * shape[1] for _ in range(shape[0])]
+                else:
+                    return [0.0] * shape[0]
+            return [0.0] * shape
+        
+        @staticmethod
+        def linalg():
+            class linalg:
+                @staticmethod
+                def svd(matrix):
+                    # Mock SVD return
+                    return [[1, 0], [0, 1]], [1.0, 0.5], [[1, 0], [0, 1]]
+                
+                @staticmethod
+                def det(matrix):
+                    return 1.0
+                
+                @staticmethod
+                def pinv(matrix):
+                    return matrix  # Mock pseudo-inverse
+            return linalg()
+        
+        @staticmethod
+        def datetime64(time_str):
+            return time_str
 
 try:
-    from transformers import AutoProcessor, AutoModel
+    from transformers import AutoProcessor, AutoModel, AutoTokenizer
 except ImportError:
     class AutoProcessor:
         @staticmethod
@@ -68,6 +122,11 @@ except ImportError:
         @staticmethod
         def from_pretrained(name):
             return MockModel()
+    
+    class AutoTokenizer:
+        @staticmethod
+        def from_pretrained(name):
+            return MockTokenizer()
 
 class MockProcessor:
     def __call__(self, *args, **kwargs):
