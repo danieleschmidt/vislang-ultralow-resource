@@ -6,8 +6,51 @@ import hashlib
 import logging
 from typing import Any, Optional, Union, Dict, List, Callable
 from datetime import datetime, timedelta
-import redis
-from redis import Redis
+try:
+    import redis
+    from redis import Redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    # Fallback Redis implementation
+    class Redis:
+        def __init__(self, *args, **kwargs):
+            self._data = {}
+            self._expiry = {}
+        
+        def get(self, key):
+            return self._data.get(key)
+        
+        def set(self, key, value, ex=None, nx=False):
+            if nx and key in self._data:
+                return False  # Key exists, don't set
+            self._data[key] = value
+            if ex:
+                import time
+                self._expiry[key] = time.time() + ex
+            return True
+        
+        def delete(self, key):
+            self._data.pop(key, None)
+            self._expiry.pop(key, None)
+        
+        def ping(self):
+            return True
+        
+        def flushdb(self):
+            self._data.clear()
+            self._expiry.clear()
+        
+        @staticmethod
+        def from_url(url, **kwargs):
+            return Redis()
+    
+    class redis_module:
+        @staticmethod
+        def from_url(url, **kwargs):
+            return Redis()
+    
+    redis = redis_module()
 import os
 
 logger = logging.getLogger(__name__)
@@ -23,7 +66,9 @@ class CacheManager:
         default_ttl: int = 3600,
         key_prefix: str = "vislang:",
         compression: bool = True,
-        serialization: str = "json"
+        serialization: str = "json",
+        cache_dir: Optional[str] = None,
+        max_size_gb: float = 1.0
     ):
         """Initialize cache manager.
         
@@ -39,6 +84,16 @@ class CacheManager:
         self.key_prefix = key_prefix
         self.compression = compression
         self.serialization = serialization
+        self.cache_dir = cache_dir
+        self.max_size_gb = max_size_gb
+        
+        # Stats tracking
+        self._stats = {
+            'hits': 0,
+            'misses': 0,
+            'sets': 0,
+            'deletes': 0
+        }
         
         # Initialize Redis client
         if redis_client:

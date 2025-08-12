@@ -713,3 +713,40 @@ def sanitize_user_input(text: str) -> str:
     """
     validator = get_security_validator()
     return validator.sanitize_input(text)
+
+
+class SecurityManager:
+    """Main security management interface."""
+    
+    def __init__(self, strict_mode: bool = True):
+        """Initialize security manager.
+        
+        Args:
+            strict_mode: Enable strict mode validation
+        """
+        self.validator = SecurityValidator(strict_mode=strict_mode)
+        self.strict_mode = strict_mode
+    
+    def validate_url(self, url: str) -> bool:
+        """Validate URL for security."""
+        return self.validator.validate_url(url)
+    
+    def sanitize_input(self, text: str) -> str:
+        """Sanitize user input."""
+        return self.validator.sanitize_input(text)
+    
+    def validate_document(self, document: Dict[str, Any]) -> bool:
+        """Validate document for security."""
+        return self.validator.validate_document(document)
+    
+    def check_rate_limit(self, identifier: str, max_requests: int = 100) -> bool:
+        """Check rate limiting."""
+        return self.validator.check_rate_limit(identifier, max_requests)
+    
+    def get_violations_summary(self) -> Dict[str, Any]:
+        """Get security violations summary."""
+        return self.validator.get_violations_summary()
+    
+    def clear_violations(self) -> None:
+        """Clear violation history."""
+        self.validator.clear_violations()
