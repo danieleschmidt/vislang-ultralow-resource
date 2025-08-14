@@ -282,7 +282,11 @@ class OCRConsensusAlgorithm:
         
         # Compute overall confidence using geometric mean
         if cluster_confidences:
-            final_confidence = statistics.geometric_mean(cluster_confidences)
+            # Use arithmetic mean as fallback for geometric mean
+            try:
+                final_confidence = statistics.geometric_mean(cluster_confidences)
+            except:
+                final_confidence = statistics.mean(cluster_confidences)
         else:
             final_confidence = 0.0
         
