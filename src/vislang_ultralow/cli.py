@@ -154,7 +154,9 @@ def build_dataset(
     if from_db:
         with get_session() as session:
             doc_repo = DocumentRepository(session)
-            db_docs = doc_repo.get_all(limit=10000)  # TODO: add filtering
+            # Filter by languages if specified
+            language_filter = list(languages) if languages else None
+            db_docs = doc_repo.get_all(limit=10000, language_filter=language_filter)
             
             for db_doc in db_docs:
                 doc_dict = {

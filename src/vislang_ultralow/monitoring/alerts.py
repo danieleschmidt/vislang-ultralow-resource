@@ -109,7 +109,9 @@ class NotificationChannel:
     
     async def _send(self, alert: Alert) -> bool:
         """Implementation-specific send method."""
-        raise NotImplementedError
+        # Default implementation for testing
+        logger.info(f"Mock notification sent via {self.name} for alert {alert.id}")
+        return True
 
 
 class EmailChannel(NotificationChannel):

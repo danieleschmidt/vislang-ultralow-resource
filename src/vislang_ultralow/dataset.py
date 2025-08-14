@@ -1015,7 +1015,7 @@ class DatasetBuilder:
             'parallel_threshold': 10,  # Minimum documents for parallel processing
             'adaptive_batch_size': True,
             'memory_optimization': True,
-            'gpu_acceleration': False,  # TODO: Implement GPU support
+            'gpu_acceleration': self._detect_gpu_capability(),
             'compression_enabled': True,
             'lazy_loading': True,
             'cache_enabled': True,
@@ -1351,29 +1351,14 @@ class DatasetBuilder:
         
         self.adaptive_metrics['optimal_batch_size'] = optimal_size
         return optimal_size
-        
-        logger.info(f"Generated {len(dataset_items)} vision-language pairs")
-        
-        # Filter by quality
-        high_quality_items = []
-        for item in dataset_items:
-            if self.validate_quality(item):
-                high_quality_items.append(item)
-        
-        logger.info(f"Filtered to {len(high_quality_items)} high-quality items")
-        
-        # Split dataset
-        dataset_splits = self._split_dataset(
-            high_quality_items, train_split, val_split, test_split
-        )
-        
-        # Format dataset
-        if output_format == "hf_dataset":
-            return self._format_huggingface_dataset(dataset_splits)
-        elif output_format == "coco":
-            return self._format_coco_dataset(dataset_splits)
-        else:
-            return dataset_splits
+    
+    def _detect_gpu_capability(self) -> bool:
+        """Detect if GPU acceleration is available."""
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except ImportError:
+            return False
     
     def _initialize_ocr_engines(self) -> None:
         """Initialize OCR engines."""
