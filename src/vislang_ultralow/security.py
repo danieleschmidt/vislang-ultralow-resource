@@ -5,17 +5,64 @@ import os
 import hashlib
 import logging
 import secrets
-from typing import Dict, List, Any, Optional, Set, Tuple
+import hmac
+import base64
+import ipaddress
+import socket
+import ssl
+import zlib
+from typing import Dict, List, Any, Optional, Set, Tuple, Union, Callable
 from pathlib import Path
 from urllib.parse import urlparse
 import json
 from datetime import datetime, timedelta
 import time
 import threading
-from collections import defaultdict
-from dataclasses import dataclass
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import bcrypt
+import jwt
+from functools import wraps, lru_cache
+import asyncio
+from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor
+import weakref
 
 logger = logging.getLogger(__name__)
+
+# Security constants
+MAX_PASSWORD_LENGTH = 128
+MIN_PASSWORD_LENGTH = 8
+MAX_TOKEN_AGE_SECONDS = 3600
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION_SECONDS = 900  # 15 minutes
+RATE_LIMIT_WINDOW_SECONDS = 300  # 5 minutes
+DEFAULT_ENCRYPTION_KEY_SIZE = 32
+MAX_PAYLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', secrets.token_urlsafe(32))
+ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', Fernet.generate_key())
+
+
+class SecurityLevel(Enum):
+    """Security levels for different operations."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class AuthenticationMethod(Enum):
+    """Authentication methods supported."""
+    API_KEY = "api_key"
+    JWT_TOKEN = "jwt_token"
+    BASIC_AUTH = "basic_auth"
+    OAUTH2 = "oauth2"
+    MUTUAL_TLS = "mutual_tls"
 
 
 @dataclass
@@ -27,45 +74,171 @@ class SecurityViolation:
     context: Dict[str, Any]
     timestamp: datetime
     source: str
+    ip_address: Optional[str] = None
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+    request_id: Optional[str] = None
+    risk_score: float = 0.0
+    blocked: bool = False
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging."""
+        return {
+            'violation_type': self.violation_type,
+            'severity': self.severity,
+            'message': self.message,
+            'context': self.context,
+            'timestamp': self.timestamp.isoformat(),
+            'source': self.source,
+            'ip_address': self.ip_address,
+            'user_id': self.user_id,
+            'session_id': self.session_id,
+            'request_id': self.request_id,
+            'risk_score': self.risk_score,
+            'blocked': self.blocked
+        }
+
+
+@dataclass
+class SecurityContext:
+    """Security context for operations."""
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    request_id: Optional[str] = None
+    auth_method: Optional[AuthenticationMethod] = None
+    permissions: Set[str] = field(default_factory=set)
+    security_level: SecurityLevel = SecurityLevel.MEDIUM
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'user_id': self.user_id,
+            'session_id': self.session_id,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'request_id': self.request_id,
+            'auth_method': self.auth_method.value if self.auth_method else None,
+            'permissions': list(self.permissions),
+            'security_level': self.security_level.value,
+            'timestamp': self.timestamp.isoformat()
+        }
+
+
+@dataclass
+class RateLimitConfig:
+    """Rate limiting configuration."""
+    max_requests: int
+    window_seconds: int
+    burst_limit: int = 0
+    exponential_backoff: bool = True
+    per_ip: bool = True
+    per_user: bool = True
+    
+
+@dataclass
+class CircuitBreakerState:
+    """Circuit breaker state tracking."""
+    failure_count: int = 0
+    last_failure_time: Optional[datetime] = None
+    state: str = "closed"  # closed, open, half_open
+    success_count: int = 0
+    failure_threshold: int = 5
+    recovery_timeout: int = 60
+    success_threshold: int = 3
 
 
 class SecurityValidator:
     """Comprehensive security validation system."""
     
-    def __init__(self, strict_mode: bool = True):
+    def __init__(self, strict_mode: bool = True, enable_encryption: bool = True):
         """Initialize security validator.
         
         Args:
             strict_mode: If True, raises exceptions for security violations
+            enable_encryption: If True, enables data encryption features
         """
         self.strict_mode = strict_mode
+        self.enable_encryption = enable_encryption
         self.violations: List[SecurityViolation] = []
         self.blocked_patterns = self._load_blocked_patterns()
         self.allowed_domains = set()
         self.blocked_domains = set()
         self.max_content_length = 50 * 1024 * 1024  # 50MB
-        self.rate_limits = defaultdict(list)
-        self.rate_limit_window = 300  # 5 minutes
+        self.rate_limits = defaultdict(lambda: deque())
+        self.rate_limit_configs = defaultdict(lambda: RateLimitConfig(100, 300))
+        self.failed_attempts = defaultdict(lambda: {'count': 0, 'last_attempt': None})
+        self.circuit_breakers = defaultdict(lambda: CircuitBreakerState())
+        self.active_sessions = weakref.WeakValueDictionary()
+        self.blocked_ips = set()
+        self.trusted_ips = set()
+        self.honeypot_tokens = set()
+        self._lock = threading.RLock()
         
-        # Security configuration
+        # Initialize encryption
+        if self.enable_encryption:
+            self.fernet = Fernet(ENCRYPTION_KEY if isinstance(ENCRYPTION_KEY, bytes) else ENCRYPTION_KEY.encode())
+            self.password_hasher = bcrypt
+        
+        # Threat intelligence
+        self.threat_patterns = self._load_threat_patterns()
+        self.malware_signatures = self._load_malware_signatures()
+        
+        # Security metrics
+        self.security_metrics = {
+            'total_requests': 0,
+            'blocked_requests': 0,
+            'security_violations': 0,
+            'authentication_failures': 0,
+            'rate_limit_hits': 0
+        }
+        
+        # Enhanced security configuration
         self.security_config = {
             'max_file_size': 100 * 1024 * 1024,  # 100MB
             'allowed_file_extensions': {
                 '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
-                '.pdf', '.txt', '.json', '.csv', '.xml'
+                '.pdf', '.txt', '.json', '.csv', '.xml', '.tiff', '.svg'
             },
             'blocked_file_extensions': {
                 '.exe', '.bat', '.cmd', '.com', '.scr', '.pif',
-                '.js', '.vbs', '.ps1', '.sh', '.php', '.asp'
+                '.js', '.vbs', '.ps1', '.sh', '.php', '.asp',
+                '.jar', '.war', '.ear', '.class', '.dll', '.so'
             },
             'max_url_length': 2048,
             'max_filename_length': 255,
             'scan_for_malware': True,
             'validate_certificates': True,
-            'block_private_ips': True
+            'block_private_ips': True,
+            'enable_content_scanning': True,
+            'max_request_size': MAX_PAYLOAD_SIZE,
+            'require_https': True,
+            'enable_csrf_protection': True,
+            'enable_xss_protection': True,
+            'enable_content_type_validation': True,
+            'session_timeout_seconds': 3600,
+            'max_concurrent_sessions': 10,
+            'enable_geo_blocking': False,
+            'allowed_countries': set(),
+            'blocked_countries': set(),
+            'enable_bot_detection': True,
+            'min_request_interval': 0.1  # seconds
         }
         
-        logger.info("Security validator initialized")
+        # Load security configurations from environment
+        self._load_security_config_from_env()
+        
+        # Initialize threat detection
+        self._initialize_threat_detection()
+        
+        logger.info("Advanced security validator initialized", extra={
+            'strict_mode': strict_mode,
+            'encryption_enabled': enable_encryption,
+            'threat_patterns_loaded': len(self.threat_patterns),
+            'malware_signatures_loaded': len(self.malware_signatures)
+        })
     
     def _load_blocked_patterns(self) -> Dict[str, List[str]]:
         """Load patterns for detecting malicious content."""
