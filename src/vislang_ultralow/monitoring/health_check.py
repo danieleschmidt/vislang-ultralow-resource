@@ -89,6 +89,32 @@ class HealthChecker:
         
         logger.info("Health checker initialized")
     
+    def check_all_components(self) -> Dict[str, HealthMetric]:
+        """Synchronous wrapper for comprehensive health check."""
+        try:
+            # Create event loop for this thread if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            return loop.run_until_complete(self.check_system_health())
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            # Return empty metrics on failure
+            timestamp = time.time()
+            return {
+                'error': HealthMetric(
+                    name="system_error",
+                    status=SystemStatus.CRITICAL,
+                    value=0.0,
+                    threshold=1.0,
+                    message=f"Health check system error: {str(e)}",
+                    timestamp=timestamp
+                )
+            }
+    
     def _default_thresholds(self) -> Dict[str, Dict]:
         """Default health check thresholds."""
         return {
@@ -778,3 +804,40 @@ class ServiceHealthChecker:
             message=f"Generic service {name} healthy",
             timestamp=time.time()
         )
+
+
+# Global health checker instance
+_global_health_checker = None
+
+
+def initialize_health_monitoring(check_interval: int = 30, enable_alerts: bool = True, auto_start: bool = True) -> HealthChecker:
+    """Initialize the global health monitoring system.
+    
+    Args:
+        check_interval: Interval between health checks in seconds
+        enable_alerts: Whether to enable health alerts (placeholder for future implementation)
+        auto_start: Whether to automatically start monitoring
+    
+    Returns:
+        HealthChecker instance
+    """
+    global _global_health_checker
+    
+    if _global_health_checker is None:
+        _global_health_checker = HealthChecker(check_interval=check_interval)
+        logger.info(f"Health monitoring initialized with {check_interval}s interval")
+        
+        if auto_start:
+            _global_health_checker.start_monitoring()
+    
+    return _global_health_checker
+
+
+def get_health_checker() -> Optional[HealthChecker]:
+    """Get the global health checker instance.
+    
+    Returns:
+        HealthChecker instance if initialized, None otherwise
+    """
+    global _global_health_checker
+    return _global_health_checker
