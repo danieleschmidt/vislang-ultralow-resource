@@ -209,7 +209,11 @@ class CacheManager:
             data = self._serialize(value)
             ttl = ttl or self.default_ttl
             
-            result = self.redis.set(cache_key, data, ex=ttl, nx=nx, xx=xx)
+            # Fix Redis set call - fallback implementation doesn't support xx parameter
+            if hasattr(self.redis, '_data'):  # Fallback implementation
+                result = self.redis.set(cache_key, data, ex=ttl, nx=nx)
+            else:  # Real Redis
+                result = self.redis.set(cache_key, data, ex=ttl, nx=nx, xx=xx)
             if result:
                 self._stats['sets'] += 1
             return bool(result)

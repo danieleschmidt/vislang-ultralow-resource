@@ -116,7 +116,7 @@ def main():
         if violations['total'] > 0:
             print(f"   📋 By severity: {violations['by_severity']}")
         
-        logger.security("Security validation tests completed", extra={'violations_count': violations['total']})
+        logger.info("Security validation tests completed", extra={'violations_count': violations['total'], 'security_event': True})
         
     except Exception as e:
         print(f"   ✗ Security validation error: {e}")
@@ -145,14 +145,15 @@ def main():
         
         # Get health summary
         health_summary = health_checker.get_health_summary()
-        print(f"   💚 Overall system status: {health_summary['overall_status']}")
+        print(f"   💚 Overall system status: {health_summary['status']}")
         
         # Check individual components
         for component_name, component in health_metrics.items():
             status_icon = "✓" if component.status.value == "healthy" else "⚠️"
-            print(f"   {status_icon} {component_name}: {component.status.value} ({len(component.metrics)} metrics)")
+            metrics_count = len(component.metadata) if component.metadata else 0
+            print(f"   {status_icon} {component_name}: {component.status.value} ({metrics_count} metrics)")
         
-        logger.info(f"Health monitoring check completed - status: {health_summary['overall_status']}")
+        logger.info(f"Health monitoring check completed - status: {health_summary['status']}")
         
     except Exception as e:
         print(f"   ✗ Health monitoring error: {e}")
