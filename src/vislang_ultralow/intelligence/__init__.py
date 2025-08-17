@@ -19,15 +19,13 @@ from .self_optimization import (
 
 from .research_intelligence import (
     NovelAlgorithmDiscovery,
-    ResearchHypothesisGenerator,
-    ExperimentAutomation,
-    PublicationQualityValidator
+    ResearchHypothesisGenerator
 )
 
 from .global_intelligence import (
+    GlobalIntelligenceCoordinator,
     CrossRegionalLearning,
     CulturalContextAdapter,
-    LanguageEvolutionTracker,
     HumanitarianInsightEngine
 )
 
@@ -42,10 +40,8 @@ __all__ = [
     "WorkloadPredictiveScaler",
     "NovelAlgorithmDiscovery",
     "ResearchHypothesisGenerator",
-    "ExperimentAutomation",
-    "PublicationQualityValidator",
+    "GlobalIntelligenceCoordinator",
     "CrossRegionalLearning",
     "CulturalContextAdapter",
-    "LanguageEvolutionTracker",
     "HumanitarianInsightEngine"
 ]
