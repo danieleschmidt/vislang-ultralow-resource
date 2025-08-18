@@ -1,0 +1,156 @@
+# Test configuration for VisLang-UltraLow-Resource
+# This configuration is optimized for fast, reliable testing
+
+# Test data configuration
+data:
+  sources: 
+    - "test"  # Use test data sources only
+  languages:
+    - "en"
+    - "sw"  # Limited languages for faster testing
+  output_format: "json"
+  min_quality_score: 0.5  # Lower threshold for test data
+  max_documents: 10  # Limit documents for faster tests
+  
+# OCR configuration for testing
+ocr:
+  engines:
+    - "tesseract"  # Use only one engine for faster tests
+  confidence_threshold: 0.5  # Lower threshold for test data
+  language_threshold: 0.7
+  max_image_size: 512  # Smaller images for faster processing
+  timeout_seconds: 30  # Shorter timeout for tests
+
+# Model configuration for testing
+model:
+  name: "hf-internal-testing/tiny-random-BlipModel"  # Tiny model for tests
+  cache_dir: "/tmp/test_model_cache"
+  device: "cpu"  # Force CPU for consistent testing
+  max_length: 50  # Shorter sequences for faster tests
+
+# Training configuration for testing
+training:
+  batch_size: 2  # Small batch size
+  learning_rate: 1e-3  # Higher LR for faster convergence in tests
+  num_epochs: 1  # Single epoch for tests
+  warmup_steps: 5  # Minimal warmup
+  eval_steps: 10  # Frequent evaluation
+  save_steps: 50  # Less frequent saving
+  logging_steps: 5  # Frequent logging for debugging
+  max_train_samples: 20  # Limit training samples
+  max_eval_samples: 10  # Limit evaluation samples
+  gradient_checkpointing: false  # Disable for faster training
+  fp16: false  # Disable for consistency
+  dataloader_num_workers: 0  # Single-threaded for reproducibility
+
+# Quality assurance configuration
+quality:
+  enable_validation: false  # Disable for faster tests
+  validation_sample_rate: 0.2  # Higher rate for smaller datasets
+  duplicate_threshold: 0.9  # Slightly lower for test data
+  min_text_length: 5  # Shorter minimum for test data
+  max_text_length: 500  # Shorter maximum for test data
+
+# Database configuration for testing
+database:
+  url: "sqlite:///:memory:"  # In-memory database for tests
+  echo: false  # Disable SQL logging for cleaner test output
+  pool_size: 1  # Single connection for tests
+  max_overflow: 0
+
+# Cache configuration for testing
+cache:
+  type: "memory"  # Use in-memory cache for tests
+  ttl: 300  # Short TTL for tests
+  max_size: 100  # Small cache size
+
+# Storage configuration for testing
+storage:
+  type: "local"
+  base_path: "/tmp/vislang_test_storage"
+  create_dirs: true
+
+# Monitoring configuration for testing
+monitoring:
+  enable_metrics: false  # Disable for cleaner tests
+  enable_logging: true
+  log_level: "DEBUG"
+  log_format: "simple"
+
+# Performance limits for testing
+performance:
+  max_processing_time: 30  # seconds
+  max_memory_usage: 500  # MB
+  max_concurrent_jobs: 2
+
+# Test-specific settings
+testing:
+  # Timeouts for different operations (seconds)
+  timeouts:
+    ocr_processing: 10
+    model_inference: 5
+    database_operation: 2
+    file_download: 15
+    
+  # Mock configurations
+  mock_external_apis: true
+  mock_file_downloads: true
+  mock_model_downloads: true
+  
+  # Fixture settings
+  generate_test_images: true
+  test_image_size: [224, 224]
+  test_dataset_size: 10
+  
+  # Assertion tolerances
+  float_tolerance: 1e-6
+  score_tolerance: 0.05
+  
+  # Reproducibility
+  random_seed: 42
+  deterministic: true
+
+# Environment overrides for different test types
+environments:
+  unit:
+    data:
+      max_documents: 3
+    training:
+      num_epochs: 1
+      max_train_samples: 5
+      max_eval_samples: 3
+    quality:
+      enable_validation: false
+      
+  integration:
+    data:
+      max_documents: 10
+    training:
+      num_epochs: 2
+      max_train_samples: 20
+      max_eval_samples: 10
+    quality:
+      enable_validation: true
+      
+  performance:
+    data:
+      max_documents: 50
+    training:
+      batch_size: 8
+      max_train_samples: 100
+      max_eval_samples: 50
+    performance:
+      max_processing_time: 60
+      max_memory_usage: 1000
+
+  e2e:
+    data:
+      max_documents: 20
+    training:
+      num_epochs: 3
+      max_train_samples: 50
+      max_eval_samples: 20
+    quality:
+      enable_validation: true
+    testing:
+      mock_external_apis: false  # Use real APIs for e2e tests
