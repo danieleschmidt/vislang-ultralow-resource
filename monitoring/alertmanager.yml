@@ -1,0 +1,110 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@vislang.org'
+  smtp_auth_username: 'alerts@vislang.org'
+  smtp_auth_password: 'password'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+    - match:
+        alertname: HighMemoryUsage
+      receiver: 'memory-alerts'
+    - match:
+        alertname: DatabaseConnectionFailure
+      receiver: 'database-alerts'
+    - match:
+        alertname: HighErrorRate
+      receiver: 'error-alerts'
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/'
+        send_resolved: true
+
+  - name: 'memory-alerts'
+    email_configs:
+      - to: 'devops@vislang.org'
+        subject: '[ALERT] High Memory Usage - {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ .Labels }}
+          {{ end }}
+
+  - name: 'database-alerts'
+    email_configs:
+      - to: 'dba@vislang.org'
+        subject: '[CRITICAL] Database Issue - {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#alerts'
+        title: 'Database Alert'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ end }}
+
+  - name: 'error-alerts'
+    email_configs:
+      - to: 'dev-team@vislang.org'
+        subject: '[ALERT] High Error Rate - {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Error Rate: {{ .Annotations.error_rate }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@vislang.org'
+        subject: '[CRITICAL] System Alert - {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          CRITICAL ALERT: {{ .Annotations.summary }}
+          
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#critical-alerts'
+        title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    pagerduty_configs:
+      - routing_key: 'YOUR_PAGERDUTY_ROUTING_KEY'
+        description: '{{ .GroupLabels.alertname }}'
+        details:
+          firing: '{{ template "__text_alert_list" . }}'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
