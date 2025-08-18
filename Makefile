@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov lint format type-check clean build upload docs
+.PHONY: help install install-dev test test-cov lint format type-check clean build upload docs docker-build docker-run
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -72,3 +72,48 @@ dev-setup: install-dev setup-secrets  ## Complete development environment setup
 
 ci: lint type-check security-check test-cov  ## Run all CI checks
 	@echo "All CI checks passed!"
+
+# Docker and containerization targets
+docker-build:  ## Build Docker image for development
+	docker build --target development -t vislang-ultralow-resource:dev .
+
+docker-build-prod:  ## Build production Docker image
+	docker build --target production -t vislang-ultralow-resource:prod .
+
+docker-run:  ## Run application in Docker (development)
+	docker-compose up --build
+
+docker-run-prod:  ## Run application in Docker (production)
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+
+docker-stop:  ## Stop Docker containers
+	docker-compose down
+
+docker-clean:  ## Clean up Docker containers and images
+	docker-compose down -v
+	docker system prune -f
+
+docker-logs:  ## Show Docker logs
+	docker-compose logs -f
+
+# Build automation
+build-multiarch:  ## Build multi-architecture images
+	./scripts/build.sh --platforms linux/amd64,linux/arm64
+
+build-all:  ## Build all Docker targets
+	./scripts/build.sh --target all
+
+# Deployment helpers
+deploy-dev:  ## Deploy development environment
+	docker-compose up -d
+
+deploy-prod:  ## Deploy production environment
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Monitoring
+monitoring-up:  ## Start monitoring stack
+	docker-compose --profile monitoring up -d
+
+# Database utilities
+db-shell:  ## Open database shell
+	docker-compose exec postgres psql -U vislang -d vislang_db

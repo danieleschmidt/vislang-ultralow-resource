@@ -1,0 +1,213 @@
+# Docker ignore file for VisLang-UltraLow-Resource
+# Optimizes build context and reduces image size
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+cover/
+.hypothesis/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Documentation build
+docs/_build/
+site/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# MyPy type checker
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Local configuration files
+.env.local
+.env.production
+config_local.yaml
+config_override.json
+
+# Data directories (too large for container builds)
+data/
+datasets/
+raw_data/
+processed_data/
+scraped_content/
+ocr_output/
+
+# Model files and checkpoints (use volume mounts)
+models/
+checkpoints/
+*.bin
+*.safetensors
+*.pth
+*.pt
+*.onnx
+*.h5
+*.pkl
+*.joblib
+
+# Cache directories
+.cache/
+huggingface_cache/
+transformers_cache/
+.ruff_cache/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+processing_*/
+
+# Docker compose files (not needed in container)
+docker-compose*.yml
+docker-compose*.yaml
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Development tools
+.pre-commit-config.yaml
+.secrets.baseline
+.pylintrc
+.flake8
+.bandit
+
+# Backup and temporary files
+*.bak
+*.backup
+*~
+*.orig
+
+# Large media files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.dmg
+*.iso
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Kubernetes manifests
+k8s/
+*.yaml
+*.yml
+
+# Monitoring and logs (use volume mounts)
+logs/
+*.log
+monitoring/
+grafana/
+prometheus/
+
+# Security files
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Development scripts
+scripts/dev/
+scripts/local/
+scripts/debug/
+
+# Test files and fixtures
+tests/fixtures/data/
+tests/performance/results/
+tests/e2e/screenshots/
+
+# Documentation source files
+docs/source/
+docs/build/
+*.md
+README*
+CHANGELOG*
+LICENSE
+CONTRIBUTING*
+CODE_OF_CONDUCT*
+
+# Package files
+*.spec
+requirements-dev.txt
+
+# Local database files
+*.sqlite
+*.sqlite3
+*.db
