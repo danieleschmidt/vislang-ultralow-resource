@@ -1,0 +1,146 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Debug Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "--tb=short",
+        "${workspaceFolder}/tests"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Debug Current Test File",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "--tb=short",
+        "${file}"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: CLI - Dataset Build",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/vislang_ultralow/cli.py",
+      "args": [
+        "build-dataset",
+        "--sources", "unhcr,who",
+        "--languages", "sw,am,ha",
+        "--output", "/tmp/dataset"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: CLI - Train Model",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/vislang_ultralow/cli.py",
+      "args": [
+        "train",
+        "--dataset", "/tmp/dataset",
+        "--model", "facebook/mblip-mt0-xl",
+        "--languages", "sw,am,ha",
+        "--epochs", "1"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: API Server",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/vislang_ultralow/api.py",
+      "args": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "APP_ENV": "development",
+        "DEBUG": "true"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Scraper Demo",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/vislang_ultralow/scraper.py",
+      "args": [
+        "--source", "unhcr",
+        "--language", "en",
+        "--max-documents", "5"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Attach to Remote",
+      "type": "python",
+      "request": "attach",
+      "port": 5678,
+      "host": "localhost",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/workspace"
+        }
+      ]
+    },
+    {
+      "name": "Docker: Debug in Container",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "preLaunchTask": "docker-compose-up-dev",
+      "postDebugTask": "docker-compose-down"
+    }
+  ]
+}

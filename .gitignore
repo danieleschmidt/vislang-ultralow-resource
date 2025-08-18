@@ -279,16 +279,16 @@ ehthumbs.db
 Thumbs.db
 
 # IDE specific
-.vscode/settings.json
-.vscode/launch.json
-.vscode/tasks.json
+# Note: .vscode/ files are included for standardized development environment
+# Individual developers can override with .vscode/settings_local.json
+.vscode/settings_local.json
 .idea/
 *.swp
 *.swo
 *~
 
 # Docker
-.dockerignore
+# Note: .dockerignore is included for standardized build optimization
 
 # Kubernetes
 *.kubeconfig
