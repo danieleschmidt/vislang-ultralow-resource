@@ -1,0 +1,228 @@
+# Dependabot configuration for VisLang-UltraLow-Resource
+# Place this file at .github/dependabot.yml
+
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    target-branch: "develop"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      - "automated"
+    reviewers:
+      - "danieleschmidt"
+    assignees:
+      - "danieleschmidt"
+    milestone: "Next Release"
+    
+    # Group updates for related packages
+    groups:
+      # Core ML/AI packages
+      ml-core:
+        patterns:
+          - "torch*"
+          - "transformers*"
+          - "datasets*"
+          - "accelerate*"
+          - "evaluate*"
+        
+      # OCR packages
+      ocr:
+        patterns:
+          - "*tesseract*"
+          - "easyocr*"
+          - "paddleocr*"
+          - "opencv*"
+          - "pillow*"
+          
+      # Database packages
+      database:
+        patterns:
+          - "sqlalchemy*"
+          - "psycopg*"
+          - "alembic*"
+          
+      # Web framework packages
+      web:
+        patterns:
+          - "fastapi*"
+          - "uvicorn*"
+          - "pydantic*"
+          - "starlette*"
+          
+      # Testing packages
+      testing:
+        patterns:
+          - "pytest*"
+          - "coverage*"
+          - "mock*"
+          - "factory*"
+          
+      # Development tools
+      dev-tools:
+        patterns:
+          - "black*"
+          - "isort*"
+          - "flake8*"
+          - "mypy*"
+          - "pre-commit*"
+    
+    # Allow specific types of updates
+    allow:
+      - dependency-type: "direct"
+        update-type: "all"
+      - dependency-type: "indirect"
+        update-type: "security"
+    
+    # Ignore specific packages or versions
+    ignore:
+      # Ignore major version updates for core ML packages (require manual review)
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "transformers"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "datasets"
+        update-types: ["version-update:semver-major"]
+        
+      # Ignore specific problematic versions
+      - dependency-name: "pillow"
+        versions: ["10.0.0"]  # Example: problematic version
+        
+    # Rebase strategy for PRs
+    rebase-strategy: "auto"
+    
+    # Auto-merge configuration
+    # Note: Enable this carefully after verifying CI pipeline reliability
+    # open-pull-requests-limit: 5
+    # auto-merge: true
+    # auto-merge-conditions:
+    #   - "status-success=ci"
+    #   - "status-success=security"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    reviewers:
+      - "danieleschmidt"
+    
+    # Group all GitHub Actions updates
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    
+    allow:
+      - dependency-type: "direct"
+        update-type: "all"
+    
+    # Pin actions to specific versions for security
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker dependencies (if using Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "11:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+    reviewers:
+      - "danieleschmidt"
+    
+    # Only allow patch and minor updates for base images
+    allow:
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+      - dependency-type: "indirect"
+        update-type: "security"
+
+  # NPM dependencies (if any JavaScript tooling is added)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "12:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps-js"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "automated"
+    reviewers:
+      - "danieleschmidt"
+    
+    groups:
+      # Group all dev dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+      
+      # Group production dependencies by type
+      build-tools:
+        patterns:
+          - "webpack*"
+          - "babel*"
+          - "rollup*"
+          - "vite*"
+    
+    allow:
+      - dependency-type: "direct"
+        update-type: "all"
+      - dependency-type: "indirect"
+        update-type: "security"
+
+# Ecosystem-specific configurations
+registries:
+  npm:
+    type: npm-registry
+    url: https://registry.npmjs.org
+    
+  python:
+    type: python-index
+    url: https://pypi.org/simple/
+    
+  docker:
+    type: docker-registry
+    url: https://registry.hub.docker.com/

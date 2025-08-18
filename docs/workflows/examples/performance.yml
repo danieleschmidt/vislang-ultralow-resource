@@ -1,0 +1,301 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests nightly
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - benchmarks
+        - load
+        - stress
+        - memory
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  benchmark-tests:
+    if: github.event.inputs.test_type == 'benchmarks' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install -e ".[dev,ocr,training]"
+        pip install pytest-benchmark pytest-xdist pytest-monitor
+        
+    - name: Run benchmark tests
+      run: |
+        pytest tests/performance/test_benchmarks.py \
+          --benchmark-only \
+          --benchmark-json=benchmark_results.json \
+          --benchmark-sort=mean \
+          --benchmark-min-rounds=5
+          
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.ref == 'refs/heads/main'
+      with:
+        tool: 'pytest'
+        output-file-path: benchmark_results.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        comment-on-alert: true
+        alert-threshold: '150%'
+        fail-on-alert: true
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: benchmark_results.json
+
+  load-tests:
+    if: github.event.inputs.test_type == 'load' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: vislang_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install -e ".[dev,ocr,training]"
+        pip install locust pytest-xdist
+        
+    - name: Start application
+      run: |
+        export DATABASE_URL="postgresql://test:test@localhost:5432/vislang_test"
+        export REDIS_URL="redis://localhost:6379/0"
+        python -m vislang_ultralow.api &
+        sleep 10
+        
+    - name: Wait for application to be ready
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+        
+    - name: Run load tests
+      run: |
+        locust --headless \
+          --users 50 \
+          --spawn-rate 5 \
+          --run-time 5m \
+          --host http://localhost:8000 \
+          --html load_test_report.html \
+          --csv load_test_results \
+          -f tests/performance/locustfile.py
+          
+    - name: Upload load test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: load-test-results
+        path: |
+          load_test_report.html
+          load_test_results*.csv
+
+  stress-tests:
+    if: github.event.inputs.test_type == 'stress' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install -e ".[dev,ocr,training]"
+        pip install psutil memory-profiler
+        
+    - name: Run stress tests
+      run: |
+        pytest tests/performance/test_benchmarks.py::TestStressTesting \
+          -v --tb=short \
+          --junitxml=stress_test_results.xml
+          
+    - name: Upload stress test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: stress-test-results
+        path: stress_test_results.xml
+
+  memory-profiling:
+    if: github.event.inputs.test_type == 'memory' || github.event.inputs.test_type == 'all' || github.event.inputs.test_type == ''
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install -e ".[dev,ocr,training]"
+        pip install memory-profiler pympler
+        
+    - name: Run memory profiling
+      run: |
+        mprof run --include-children --backend psutil \
+          python -m pytest tests/performance/test_benchmarks.py::TestPerformanceBenchmarks::test_memory_usage_during_batch_processing
+        mprof plot --output memory_profile.png
+        
+    - name: Generate memory report
+      run: |
+        python -c "
+        import tracemalloc
+        import subprocess
+        import json
+        
+        # Memory usage report
+        result = subprocess.run(['mprof', 'list'], capture_output=True, text=True)
+        
+        report = {
+            'timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+            'profile_data': result.stdout,
+            'max_memory_mb': 'See memory_profile.png'
+        }
+        
+        with open('memory_report.json', 'w') as f:
+            json.dump(report, f, indent=2)
+        "
+        
+    - name: Upload memory profiling results
+      uses: actions/upload-artifact@v4
+      with:
+        name: memory-profiling-results
+        path: |
+          memory_profile.png
+          memory_report.json
+          mprofile_*.dat
+
+  performance-regression-check:
+    runs-on: ubuntu-latest
+    needs: [benchmark-tests]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Download benchmark results
+      uses: actions/download-artifact@v4
+      with:
+        name: benchmark-results
+        
+    - name: Check for performance regressions
+      run: |
+        # Compare current benchmark results with baseline
+        python scripts/performance/check_regression.py \
+          --current benchmark_results.json \
+          --baseline-branch main \
+          --threshold 20 \
+          --output regression_report.md
+          
+    - name: Comment PR with performance results
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('regression_report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## Performance Test Results\n\n${report}`
+          });
+
+  nightly-performance-report:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: [benchmark-tests, load-tests, stress-tests, memory-profiling]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all performance results
+      uses: actions/download-artifact@v4
+      
+    - name: Generate nightly performance report
+      run: |
+        python scripts/performance/generate_report.py \
+          --benchmark-results benchmark-results/benchmark_results.json \
+          --load-results load-test-results/ \
+          --stress-results stress-test-results/stress_test_results.xml \
+          --memory-results memory-profiling-results/ \
+          --output nightly_performance_report.html
+          
+    - name: Upload nightly report
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-performance-report
+        path: nightly_performance_report.html
+        
+    - name: Send performance alert if needed
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Performance Regression Detected',
+            body: `Performance tests failed in nightly run. Please check the results and investigate any regressions.\n\nWorkflow: ${context.workflow}\nRun: ${context.runId}`,
+            labels: ['performance', 'alert', 'needs-investigation']
+          });
