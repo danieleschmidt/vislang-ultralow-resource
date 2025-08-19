@@ -1,0 +1,349 @@
+{
+  "Enhanced Generation 1 Test Report": {
+    "timestamp": "2025-08-19 23:04:38",
+    "total_tests": 7,
+    "passed_tests": 4,
+    "success_rate": "57.1%",
+    "test_results": {
+      "Synthetic Dataset Generation": {
+        "status": "PASSED",
+        "details": {
+          "success": true,
+          "strategy_results": {
+            "template_variation": {
+              "samples_generated": 50,
+              "average_quality": 0.6441666666666667,
+              "languages_covered": 4,
+              "metadata": {
+                "total_samples": 50,
+                "strategy": "template_variation",
+                "generation_stats": {
+                  "template_variation": 50
+                },
+                "target_languages": [
+                  "sw",
+                  "am",
+                  "ha",
+                  "en"
+                ],
+                "quality_distribution": {
+                  "mean_quality": 0.6441666666666667,
+                  "min_quality": 0.6333333333333334,
+                  "max_quality": 0.6583333333333333,
+                  "num_samples": 50
+                }
+              }
+            },
+            "cross_lingual_adaptation": {
+              "samples_generated": 50,
+              "average_quality": 0.6798333333333333,
+              "languages_covered": 4,
+              "metadata": {
+                "total_samples": 50,
+                "strategy": "cross_lingual_adaptation",
+                "generation_stats": {
+                  "cross_lingual_adaptation": 50
+                },
+                "target_languages": [
+                  "sw",
+                  "am",
+                  "ha",
+                  "en"
+                ],
+                "quality_distribution": {
+                  "mean_quality": 0.6798333333333333,
+                  "min_quality": 0.6416666666666667,
+                  "max_quality": 0.7000000000000001,
+                  "num_samples": 50
+                }
+              }
+            },
+            "mixed": {
+              "samples_generated": 48,
+              "average_quality": 0.6880982258773445,
+              "languages_covered": 4,
+              "metadata": {
+                "total_samples": 48,
+                "strategy": "mixed",
+                "generation_stats": {
+                  "template_variation": 12,
+                  "cross_lingual_adaptation": 12,
+                  "visual_augmentation": 12,
+                  "contextual_expansion": 12
+                },
+                "target_languages": [
+                  "sw",
+                  "am",
+                  "ha",
+                  "en"
+                ],
+                "quality_distribution": {
+                  "mean_quality": 0.6880982258773445,
+                  "min_quality": 0.6333333333333334,
+                  "max_quality": 0.7474433355522313,
+                  "num_samples": 48
+                }
+              }
+            }
+          },
+          "generation_statistics": {
+            "total_generated_samples": 148,
+            "strategy_usage": {
+              "template_variation": 50,
+              "cross_lingual_adaptation": 50,
+              "mixed": 48
+            },
+            "target_languages": [
+              "sw",
+              "am",
+              "ha",
+              "en"
+            ],
+            "available_strategies": [
+              "template_variation",
+              "cross_lingual_adaptation",
+              "visual_augmentation",
+              "contextual_expansion"
+            ],
+            "generation_sessions": 3,
+            "vocabulary_size": 34
+          },
+          "total_samples_generated": 148
+        }
+      },
+      "Intelligent OCR Pipeline": {
+        "status": "FAILED",
+        "details": {
+          "success": false,
+          "error": "'list' object has no attribute 'shape'"
+        }
+      },
+      "Cross-Lingual Alignment": {
+        "status": "FAILED",
+        "details": {
+          "success": false,
+          "error": "unsupported operand type(s) for +: 'int' and 'list'"
+        }
+      },
+      "Novel Algorithm Discovery": {
+        "status": "PASSED",
+        "details": {
+          "success": true,
+          "discovered_algorithms": [
+            {
+              "config": {
+                "preprocessing": "noise_reduction",
+                "feature_extraction": "cnn_features",
+                "learning_algorithms": "few_shot_learning",
+                "optimization": "sgd",
+                "regularization": "batch_norm",
+                "hyperparameters": {
+                  "learning_rate": 0.001,
+                  "batch_size": 32,
+                  "dropout_rate": 0.2,
+                  "weight_decay": 0.0001,
+                  "warmup_steps": 500
+                }
+              },
+              "performance": 1.1532163421254833,
+              "discovery_iteration": 64,
+              "novelty_score": 0.42000000000000004,
+              "timestamp": "2025-08-19T23:04:36.307017"
+            },
+            {
+              "config": {
+                "preprocessing": "data_augmentation",
+                "feature_extraction": "hand_crafted",
+                "learning_algorithms": "gradient_descent",
+                "optimization": "sgd",
+                "regularization": "batch_norm",
+                "hyperparameters": {
+                  "learning_rate": 0.001,
+                  "batch_size": 32,
+                  "dropout_rate": 0.2,
+                  "weight_decay": 0.0001,
+                  "warmup_steps": 500
+                }
+              },
+              "performance": 1.1512213839287635,
+              "discovery_iteration": 27,
+              "novelty_score": 0.42000000000000004,
+              "timestamp": "2025-08-19T23:04:36.301069"
+            },
+            {
+              "config": {
+                "preprocessing": "noise_reduction",
+                "feature_extraction": "cnn_features",
+                "learning_algorithms": "bayesian_optimization",
+                "optimization": "adagrad",
+                "regularization": "adversarial_training",
+                "hyperparameters": {
+                  "learning_rate": 0.001,
+                  "batch_size": 32,
+                  "dropout_rate": 0.2,
+                  "weight_decay": 0.0001,
+                  "warmup_steps": 500
+                }
+              },
+              "performance": 1.1406239735929131,
+              "discovery_iteration": 49,
+              "novelty_score": 0.42000000000000004,
+              "timestamp": "2025-08-19T23:04:36.304594"
+            },
+            {
+              "config": {
+                "preprocessing": "data_augmentation",
+                "feature_extraction": "multimodal_fusion",
+                "learning_algorithms": "self_supervised",
+                "optimization": "custom_adaptive",
+                "regularization": "layer_norm",
+                "hyperparameters": {
+                  "learning_rate": 0.001,
+                  "batch_size": 32,
+                  "dropout_rate": 0.2,
+                  "weight_decay": 0.0001,
+                  "warmup_steps": 500
+                }
+              },
+              "performance": 1.1372269586608776,
+              "discovery_iteration": 2,
+              "novelty_score": 0.7,
+              "timestamp": "2025-08-19T23:04:36.297794"
+            },
+            {
+              "config": {
+                "preprocessing": "normalize",
+                "feature_extraction": "learned_embeddings",
+                "learning_algorithms": "bayesian_optimization",
+                "optimization": "lion",
+                "regularization": "adversarial_training",
+                "hyperparameters": {
+                  "learning_rate": 0.001,
+                  "batch_size": 32,
+                  "dropout_rate": 0.2,
+                  "weight_decay": 0.0001,
+                  "warmup_steps": 500
+                }
+              },
+              "performance": 1.1371542120534424,
+              "discovery_iteration": 10,
+              "novelty_score": 0.56,
+              "timestamp": "2025-08-19T23:04:36.298713"
+            }
+          ],
+          "analysis": {
+            "total_discovered": 10,
+            "performance_range": [
+              1.052442230246908,
+              1.1532163421254833
+            ],
+            "novelty_scores": [
+              0.42000000000000004,
+              0.42000000000000004,
+              0.42000000000000004,
+              0.7,
+              0.56,
+              0.42000000000000004,
+              0.42000000000000004,
+              0.42000000000000004,
+              1.0,
+              0.42000000000000004
+            ],
+            "algorithm_types": [
+              "gradient_descent",
+              "bayesian_optimization",
+              "few_shot_learning",
+              "self_supervised",
+              "meta_learning",
+              "evolutionary_strategy"
+            ]
+          },
+          "exploration_completed": true
+        }
+      },
+      "Research Hypothesis Generation": {
+        "status": "PASSED",
+        "details": {
+          "success": true,
+          "hypotheses": [],
+          "analysis": {
+            "total_generated": 0,
+            "confidence_distribution": [],
+            "hypothesis_types": [],
+            "validation_status": []
+          },
+          "generation_completed": true
+        }
+      },
+      "Performance Tracking": {
+        "status": "PASSED",
+        "details": {
+          "success": true,
+          "metrics_tracked": [
+            "ocr_accuracy",
+            "alignment_quality",
+            "synthesis_quality",
+            "overall_performance"
+          ],
+          "summary": {
+            "ocr_accuracy": {
+              "current": 0.85,
+              "mean": 0.8,
+              "count": 5
+            },
+            "alignment_quality": {
+              "current": 0.76,
+              "mean": 0.716,
+              "count": 5
+            },
+            "synthesis_quality": {
+              "current": 0.8,
+              "mean": 0.75,
+              "count": 5
+            },
+            "overall_performance": {
+              "current": 0.81,
+              "mean": 0.752,
+              "count": 5
+            }
+          },
+          "detailed_analysis": {
+            "total_metrics_tracked": 4,
+            "metric_summaries": {
+              "ocr_accuracy": {
+                "current": 0.85,
+                "mean": 0.8,
+                "count": 5
+              },
+              "alignment_quality": {
+                "current": 0.76,
+                "mean": 0.716,
+                "count": 5
+              },
+              "synthesis_quality": {
+                "current": 0.8,
+                "mean": 0.75,
+                "count": 5
+              },
+              "overall_performance": {
+                "current": 0.81,
+                "mean": 0.752,
+                "count": 5
+              }
+            },
+            "data_points_collected": 20,
+            "tracking_duration": "session_based"
+          },
+          "tracking_operational": true
+        }
+      },
+      "Integrated Pipeline": {
+        "status": "FAILED",
+        "details": {
+          "success": false,
+          "error": "'list' object has no attribute 'shape'"
+        }
+      }
+    }
+  }
+}
