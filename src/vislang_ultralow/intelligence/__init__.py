@@ -29,6 +29,9 @@ from .global_intelligence import (
     HumanitarianInsightEngine
 )
 
+from .dataset_synthesis import SyntheticDatasetGenerator
+from .integrated_pipeline import IntelligentHumanitarianPipeline, PerformanceTracker
+
 __all__ = [
     "AdaptiveLearningEngine",
     "AutoMLPipelineOptimizer", 
@@ -43,5 +46,8 @@ __all__ = [
     "GlobalIntelligenceCoordinator",
     "CrossRegionalLearning",
     "CulturalContextAdapter",
-    "HumanitarianInsightEngine"
+    "HumanitarianInsightEngine",
+    "SyntheticDatasetGenerator",
+    "IntelligentHumanitarianPipeline",
+    "PerformanceTracker"
 ]
