@@ -1133,22 +1133,35 @@ class SecurityManager:
         """
         self.validator = SecurityValidator(strict_mode=strict_mode)
         self.strict_mode = strict_mode
-    
+        self.audit_logger = SecurityAuditLogger()
+        self.incident_responder = SecurityIncidentResponder()
+        
     def validate_url(self, url: str) -> bool:
         """Validate URL for security."""
-        return self.validator.validate_url(url)
+        result = self.validator.validate_url(url)
+        self.audit_logger.log_url_validation(url, result)
+        return result
     
     def sanitize_input(self, text: str) -> str:
         """Sanitize user input."""
-        return self.validator.sanitize_input(text)
+        original_text = text
+        sanitized = self.validator.sanitize_input(text)
+        if original_text != sanitized:
+            self.audit_logger.log_input_sanitization(original_text, sanitized)
+        return sanitized
     
     def validate_document(self, document: Dict[str, Any]) -> bool:
         """Validate document for security."""
-        return self.validator.validate_document(document)
+        result = self.validator.validate_document(document)
+        self.audit_logger.log_document_validation(document, result)
+        return result
     
     def check_rate_limit(self, identifier: str, max_requests: int = 100) -> bool:
         """Check rate limiting."""
-        return self.validator.check_rate_limit(identifier, max_requests)
+        result = self.validator.check_rate_limit(identifier, max_requests)
+        if not result:
+            self.incident_responder.handle_rate_limit_exceeded(identifier)
+        return result
     
     def get_violations_summary(self) -> Dict[str, Any]:
         """Get security violations summary."""
@@ -1157,3 +1170,162 @@ class SecurityManager:
     def clear_violations(self) -> None:
         """Clear violation history."""
         self.validator.clear_violations()
+    
+    def enable_zero_trust_mode(self):
+        """Enable zero-trust security mode."""
+        logger.info("Enabling zero-trust security mode")
+        self.validator.security_config.update({
+            'require_certificate_pinning': True,
+            'mandate_end_to_end_encryption': True,
+            'enforce_least_privilege': True,
+            'continuous_verification': True,
+            'trust_nothing_by_default': True
+        })
+    
+    def perform_security_audit(self) -> Dict[str, Any]:
+        """Perform comprehensive security audit."""
+        return self.audit_logger.generate_security_report()
+
+
+class SecurityAuditLogger:
+    """Comprehensive security audit logging system."""
+    
+    def __init__(self):
+        self.audit_events = []
+        self.high_risk_events = []
+        
+    def log_url_validation(self, url: str, result: bool):
+        """Log URL validation events."""
+        event = {
+            'type': 'url_validation',
+            'url': url[:100],  # Truncate for security
+            'result': result,
+            'timestamp': datetime.now().isoformat(),
+            'risk_level': 'high' if not result else 'low'
+        }
+        self.audit_events.append(event)
+        if not result:
+            self.high_risk_events.append(event)
+    
+    def log_input_sanitization(self, original: str, sanitized: str):
+        """Log input sanitization events."""
+        event = {
+            'type': 'input_sanitization',
+            'changes_made': original != sanitized,
+            'timestamp': datetime.now().isoformat(),
+            'risk_level': 'medium' if original != sanitized else 'low'
+        }
+        self.audit_events.append(event)
+    
+    def log_document_validation(self, document: Dict[str, Any], result: bool):
+        """Log document validation events."""
+        event = {
+            'type': 'document_validation',
+            'document_id': document.get('id', 'unknown'),
+            'result': result,
+            'timestamp': datetime.now().isoformat(),
+            'risk_level': 'high' if not result else 'low'
+        }
+        self.audit_events.append(event)
+        if not result:
+            self.high_risk_events.append(event)
+    
+    def generate_security_report(self) -> Dict[str, Any]:
+        """Generate comprehensive security audit report."""
+        total_events = len(self.audit_events)
+        high_risk_count = len(self.high_risk_events)
+        
+        return {
+            'total_audit_events': total_events,
+            'high_risk_events': high_risk_count,
+            'risk_ratio': high_risk_count / total_events if total_events > 0 else 0,
+            'event_types': self._count_event_types(),
+            'recent_high_risk_events': self.high_risk_events[-10:],
+            'security_posture': 'critical' if high_risk_count > 50 else 'good',
+            'recommendations': self._generate_recommendations()
+        }
+    
+    def _count_event_types(self) -> Dict[str, int]:
+        """Count events by type."""
+        counts = defaultdict(int)
+        for event in self.audit_events:
+            counts[event['type']] += 1
+        return dict(counts)
+    
+    def _generate_recommendations(self) -> List[str]:
+        """Generate security recommendations."""
+        recommendations = []
+        
+        if len(self.high_risk_events) > 10:
+            recommendations.append("Consider implementing stricter input validation")
+        
+        if any(event['type'] == 'url_validation' and not event['result'] 
+               for event in self.high_risk_events):
+            recommendations.append("Review and update URL whitelist policies")
+        
+        return recommendations
+
+
+class SecurityIncidentResponder:
+    """Automated security incident response system."""
+    
+    def __init__(self):
+        self.incident_count = defaultdict(int)
+        self.blocked_entities = set()
+        self.incident_log = []
+        
+    def handle_rate_limit_exceeded(self, identifier: str):
+        """Handle rate limit exceeded incidents."""
+        self.incident_count[identifier] += 1
+        
+        incident = {
+            'type': 'rate_limit_exceeded',
+            'identifier': identifier,
+            'count': self.incident_count[identifier],
+            'timestamp': datetime.now().isoformat(),
+            'action_taken': 'logged'
+        }
+        
+        # Escalate based on repeat offenses
+        if self.incident_count[identifier] > 5:
+            self.blocked_entities.add(identifier)
+            incident['action_taken'] = 'blocked'
+            logger.warning(f"Blocking identifier {identifier} after repeated violations")
+        
+        self.incident_log.append(incident)
+    
+    def handle_security_violation(self, violation: SecurityViolation):
+        """Handle general security violations."""
+        incident = {
+            'type': 'security_violation',
+            'violation_type': violation.violation_type,
+            'severity': violation.severity,
+            'timestamp': violation.timestamp.isoformat(),
+            'action_taken': 'investigated'
+        }
+        
+        if violation.severity in ['HIGH', 'CRITICAL']:
+            incident['action_taken'] = 'escalated'
+            logger.critical(f"Critical security violation: {violation.message}")
+        
+        self.incident_log.append(incident)
+    
+    def get_incident_summary(self) -> Dict[str, Any]:
+        """Get incident response summary."""
+        return {
+            'total_incidents': len(self.incident_log),
+            'blocked_entities': len(self.blocked_entities),
+            'recent_incidents': self.incident_log[-10:],
+            'incident_types': self._count_incident_types(),
+            'escalated_incidents': [
+                incident for incident in self.incident_log
+                if incident.get('action_taken') == 'escalated'
+            ]
+        }
+    
+    def _count_incident_types(self) -> Dict[str, int]:
+        """Count incidents by type."""
+        counts = defaultdict(int)
+        for incident in self.incident_log:
+            counts[incident['type']] += 1
+        return dict(counts)

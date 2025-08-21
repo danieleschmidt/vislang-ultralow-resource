@@ -14,6 +14,38 @@ try:
 except ImportError:
     _quantum_optimizer_available = False
 
+# Enhanced Generation 3+ optimization modules
+try:
+    from .distributed_processor import (
+        DistributedTaskManager,
+        ClusterResourceManager,
+        FaultTolerantProcessor
+    )
+    _distributed_available = True
+except ImportError:
+    _distributed_available = False
+
+try:
+    from .adaptive_scaling import (
+        AutoScaler,
+        PredictiveScaler,
+        ResourceUsageOptimizer,
+        LoadBalancer
+    )
+    _adaptive_scaling_available = True
+except ImportError:
+    _adaptive_scaling_available = False
+
+try:
+    from .memory_optimizer import (
+        MemoryManager,
+        CacheOptimizer,
+        GarbageCollectionTuner
+    )
+    _memory_optimizer_available = True
+except ImportError:
+    _memory_optimizer_available = False
+
 __all__ = [
     "PerformanceOptimizer",
     "OptimizationStrategy",
@@ -26,4 +58,26 @@ if _quantum_optimizer_available:
         "QuantumInspiredOptimizer",
         "AdaptiveResourceAllocator",
         "ResourcePerformancePredictor"
+    ])
+
+if _distributed_available:
+    __all__.extend([
+        "DistributedTaskManager",
+        "ClusterResourceManager",
+        "FaultTolerantProcessor"
+    ])
+
+if _adaptive_scaling_available:
+    __all__.extend([
+        "AutoScaler",
+        "PredictiveScaler", 
+        "ResourceUsageOptimizer",
+        "LoadBalancer"
+    ])
+
+if _memory_optimizer_available:
+    __all__.extend([
+        "MemoryManager",
+        "CacheOptimizer",
+        "GarbageCollectionTuner"
     ])
