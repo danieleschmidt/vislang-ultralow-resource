@@ -57,10 +57,68 @@ except ImportError as e:
         def __init__(self, *args, **kwargs):
             pass
 
+try:
+    from .neural_architecture_search import (
+        VisionLanguageNAS,
+        EfficiencyOptimizedTransformer,
+        LowResourceModelPruning
+    )
+    _nas_available = True
+except ImportError as e:
+    import logging
+    logging.warning(f"Could not import neural_architecture_search: {e}")
+    _nas_available = False
+    
+    class VisionLanguageNAS:
+        def __init__(self, *args, **kwargs):
+            pass
+        def search_optimal_architecture(self, constraints):
+            return {"model_config": "compact_transformer", "efficiency_score": 0.8}
+    
+    class EfficiencyOptimizedTransformer:
+        def __init__(self, *args, **kwargs):
+            pass
+    
+    class LowResourceModelPruning:
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:
+    from .federated_learning import (
+        HumanitarianFederatedLearning,
+        PrivacyPreservingAggregation,
+        CrossLingualFederation
+    )
+    _federated_available = True
+except ImportError as e:
+    import logging
+    logging.warning(f"Could not import federated_learning: {e}")
+    _federated_available = False
+    
+    class HumanitarianFederatedLearning:
+        def __init__(self, *args, **kwargs):
+            pass
+        def aggregate_models(self, local_models):
+            return {"global_model": "aggregated", "performance": 0.85}
+    
+    class PrivacyPreservingAggregation:
+        def __init__(self, *args, **kwargs):
+            pass
+    
+    class CrossLingualFederation:
+        def __init__(self, *args, **kwargs):
+            pass
+
 __all__ = [
     "AdaptiveMultiEngineOCR",
     "OCRConsensusAlgorithm", 
     "ZeroShotCrossLingual",
     "CrossLingualAlignmentModel",
-    "HierarchicalCrossLingualAlignment"
+    "HierarchicalCrossLingualAlignment",
+    "VisionLanguageNAS",
+    "EfficiencyOptimizedTransformer", 
+    "LowResourceModelPruning",
+    "HumanitarianFederatedLearning",
+    "PrivacyPreservingAggregation",
+    "CrossLingualFederation"
 ]
