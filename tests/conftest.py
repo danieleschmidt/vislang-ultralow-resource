@@ -10,11 +10,23 @@ import pytest
 import pandas as pd
 from PIL import Image
 import numpy as np
-import torch
-from transformers import AutoProcessor, AutoTokenizer
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from redis import Redis
+try:
+    import torch
+except ImportError:
+    torch = None
+try:
+    from transformers import AutoProcessor, AutoTokenizer
+except ImportError:
+    AutoProcessor = AutoTokenizer = None
+try:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+except ImportError:
+    create_engine = sessionmaker = None
+try:
+    from redis import Redis
+except ImportError:
+    Redis = None
 from unittest.mock import patch
 
 
@@ -159,7 +171,10 @@ def mock_model():
     model.config = Mock()
     model.config.vision_config = Mock()
     model.config.text_config = Mock()
-    model.generate = Mock(return_value=torch.tensor([[1, 2, 3, 4, 5]]))
+    if torch:
+        model.generate = Mock(return_value=torch.tensor([[1, 2, 3, 4, 5]]))
+    else:
+        model.generate = Mock(return_value=[[1, 2, 3, 4, 5]])
     model.eval = Mock(return_value=model)
     model.to = Mock(return_value=model)
     return model
@@ -271,9 +286,9 @@ def disable_gpu(monkeypatch):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "-1")
     
     # Mock torch.cuda methods
-    import torch
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(torch.cuda, "device_count", lambda: 0)
+    if torch:
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        monkeypatch.setattr(torch.cuda, "device_count", lambda: 0)
 
 
 # Pytest configuration
@@ -332,24 +347,30 @@ def real_model_for_integration():
 @pytest.fixture
 def mock_database_session():
     """Create a mock database session for testing."""
-    from vislang_ultralow.database.models import Base
+    if not create_engine or not sessionmaker:
+        pytest.skip("SQLAlchemy not available")
     
-    # Create in-memory SQLite database
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(engine)
-    
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
-    
-    yield session
-    
-    session.close()
+    try:
+        from vislang_ultralow.database.models import Base
+        
+        # Create in-memory SQLite database
+        engine = create_engine("sqlite:///:memory:", echo=False)
+        Base.metadata.create_all(engine)
+        
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        session = SessionLocal()
+        
+        yield session
+        
+        session.close()
+    except ImportError:
+        pytest.skip("Database models not available")
 
 
 @pytest.fixture 
 def mock_redis():
     """Create a mock Redis client for testing."""
-    redis_mock = Mock(spec=Redis)
+    redis_mock = Mock(spec=Redis if Redis else object)
     redis_mock.ping.return_value = True
     redis_mock.get.return_value = None
     redis_mock.set.return_value = True

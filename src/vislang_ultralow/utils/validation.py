@@ -63,6 +63,39 @@ class DataValidator:
         self.strict_mode = strict_mode
         self.validation_errors = []
     
+    def validate(self, data: Dict[str, Any]) -> bool:
+        """General validation method for any data structure.
+        
+        Args:
+            data: Data dictionary to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        if not isinstance(data, dict):
+            return False
+        
+        # Check for common required fields
+        if 'text' in data:
+            if not data['text'] or not isinstance(data['text'], str):
+                return False
+        
+        if 'language' in data:
+            if not self._validate_language_code(data['language']):
+                return False
+        
+        if 'quality_score' in data:
+            score = data['quality_score']
+            if not isinstance(score, (int, float)) or not (0 <= score <= 1):
+                return False
+        
+        if 'source' in data:
+            valid_sources = ['unhcr', 'who', 'unicef', 'wfp', 'ocha', 'undp']
+            if data['source'] not in valid_sources:
+                return False
+        
+        return True
+    
     def validate_document(self, document: Dict[str, Any]) -> bool:
         """Validate document structure and content.
         

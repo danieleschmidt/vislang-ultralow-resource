@@ -576,12 +576,17 @@ class TaskScheduler:
 class ParallelProcessor:
     """High-level parallel processing interface."""
     
-    def __init__(self, scheduler: TaskScheduler = None):
+    def __init__(self, scheduler: TaskScheduler = None, max_workers: int = None):
         self.scheduler = scheduler or TaskScheduler()
         self.batch_processors = {}
+        self.max_workers = max_workers or multiprocessing.cpu_count()
         
         if not self.scheduler.is_running:
             self.scheduler.start()
+    
+    def process_batch(self, items: List[Any], func: Callable, batch_size: int = None) -> List[Any]:
+        """Process items in batches for compatibility."""
+        return self.batch_process(func, items, batch_size or 32)
     
     def map(self, func: Callable, items: List[Any], 
             use_processes: bool = False, chunk_size: int = None) -> List[Any]:
