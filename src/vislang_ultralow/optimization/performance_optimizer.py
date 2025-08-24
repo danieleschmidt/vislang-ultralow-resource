@@ -287,9 +287,51 @@ class PerformanceOptimizer:
             profile.execution_times.append(execution_time)
             profile.memory_usage.append(memory_delta)
             profile.cpu_usage.append(cpu_delta)
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get current performance metrics."""
+        process = psutil.Process()
+        cpu_percent = process.cpu_percent()
+        memory_info = process.memory_info()
+        
+        return {
+            'cpu_usage': cpu_percent,
+            'memory_usage': memory_info.rss / (1024 * 1024),  # MB
+            'memory_percent': psutil.virtual_memory().percent,
+            'processing_speed': self._calculate_processing_speed(),
+            'active_profiles': len(self.profiles),
+            'resource_limits': self.resource_limits.copy()
+        }
+    
+    def _calculate_processing_speed(self) -> float:
+        """Calculate overall processing speed metric."""
+        if not self.profiles:
+            return 0.0
+        
+        total_operations = sum(p.success_count for p in self.profiles.values())
+        avg_time = sum(p.avg_execution_time for p in self.profiles.values()) / len(self.profiles)
+        
+        return total_operations / max(avg_time, 0.001)  # operations per second
+    
+    def get_optimization_recommendations(self) -> List[str]:
+        """Get optimization recommendations based on current metrics."""
+        recommendations = []
+        metrics = self.get_performance_metrics()
+        
+        if metrics['cpu_usage'] > 80:
+            recommendations.append("High CPU usage detected - consider reducing parallelism")
+        
+        if metrics['memory_percent'] > 85:
+            recommendations.append("High memory usage - enable memory optimization")
             
-            # Check if optimization is needed
-            self._check_optimization_needed(operation_name, profile)
+        if metrics['processing_speed'] < 1.0:
+            recommendations.append("Low processing speed - consider batch optimization")
+        
+        for name, profile in self.profiles.items():
+            if profile.error_count / max(profile.success_count, 1) > 0.1:
+                recommendations.append(f"High error rate in {name} - review implementation")
+        
+        return recommendations
     
     def _check_optimization_needed(self, operation_name: str, profile: PerformanceProfile):
         """Check if operation needs optimization."""

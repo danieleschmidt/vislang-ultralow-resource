@@ -772,6 +772,28 @@ class ClusterResourceManager:
         }
 
 
+class DistributedProcessor:
+    """Simple distributed processor for testing."""
+    
+    def __init__(self):
+        self.task_queue = []
+        self.workers = []
+        self.results = {}
+    
+    def distribute_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Distribute tasks and return results."""
+        results = []
+        for task in tasks:
+            # Simple mock processing for now
+            result = {
+                "id": task["id"],
+                "status": "completed", 
+                "result": f"processed_{task['data']}"
+            }
+            results.append(result)
+        return results
+
+
 class FaultTolerantProcessor:
     """Fault-tolerant processing with automatic recovery."""
     

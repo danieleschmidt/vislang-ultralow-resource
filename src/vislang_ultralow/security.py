@@ -147,6 +147,44 @@ class SecurityContext:
     request_id: Optional[str] = None
     auth_method: Optional[AuthenticationMethod] = None
     permissions: Set[str] = field(default_factory=set)
+
+
+@dataclass
+class SecurityConfig:
+    """Security configuration settings."""
+    rate_limiting: bool = True
+    input_validation: bool = True
+    data_sanitization: bool = True
+    encryption_enabled: bool = True
+    audit_logging: bool = True
+    max_request_size: int = MAX_PAYLOAD_SIZE
+    token_expiry: int = MAX_TOKEN_AGE_SECONDS
+    password_complexity: bool = True
+    ip_whitelisting: bool = False
+    allowed_ips: Set[str] = field(default_factory=set)
+    blocked_ips: Set[str] = field(default_factory=set)
+    security_headers: bool = True
+    csrf_protection: bool = True
+    sql_injection_protection: bool = True
+    xss_protection: bool = True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'rate_limiting': self.rate_limiting,
+            'input_validation': self.input_validation, 
+            'data_sanitization': self.data_sanitization,
+            'encryption_enabled': self.encryption_enabled,
+            'audit_logging': self.audit_logging,
+            'max_request_size': self.max_request_size,
+            'token_expiry': self.token_expiry,
+            'password_complexity': self.password_complexity,
+            'ip_whitelisting': self.ip_whitelisting,
+            'security_headers': self.security_headers,
+            'csrf_protection': self.csrf_protection,
+            'sql_injection_protection': self.sql_injection_protection,
+            'xss_protection': self.xss_protection,
+        }
     security_level: SecurityLevel = SecurityLevel.MEDIUM
     timestamp: datetime = field(default_factory=datetime.now)
     
