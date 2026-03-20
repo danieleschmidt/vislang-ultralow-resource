@@ -25,49 +25,49 @@ class HumanitarianReportScraper:
 
     RELIEFWEB_API = "https://api.reliefweb.int/v1/reports"
 
-    def __init__(self, base_url="https://reliefweb.int/updates", timeout=10):
+    def __init__(self, base_url="https://reliefweb.int/api/v1/reports", timeout=10):
         self.base_url = base_url
         self.timeout = timeout
 
-    def fetch_reports(self, query="humanitarian", n_pages=1, language=None):
+    def fetch_reports(self, query="humanitarian", limit=10, lang="en"):
         """Fetch reports from ReliefWeb API. Falls back to dummy data on failure."""
         results = []
         try:
             params = {
                 "appname": "vislang",
-                "limit": 10,
+                "limit": limit,
                 "query[value]": query,
                 "fields[include][]": ["title", "url_alias", "date", "language", "body"],
             }
-            if language:
-                params["filter[field]"] = "language.code"
-                params["filter[value]"] = language
-
-            for page in range(n_pages):
-                params["offset"] = page * 10
-                resp = requests.get(self.RELIEFWEB_API, params=params, timeout=self.timeout)
-                resp.raise_for_status()
-                data = resp.json()
-                items = data.get("data", [])
-                for item in items:
-                    fields = item.get("fields", {})
-                    lang = fields.get("language", [{}])
-                    lang_code = lang[0].get("code", "en") if lang else "en"
-                    date_val = fields.get("date", {})
-                    date_str = (
-                        date_val.get("created", "") if isinstance(date_val, dict) else str(date_val)
-                    )
-                    results.append({
-                        "title": fields.get("title", ""),
-                        "url": fields.get("url_alias", ""),
-                        "date": date_str,
-                        "language": lang_code,
-                        "summary": (fields.get("body", "") or "")[:200],
-                    })
+            resp = requests.get(self.base_url, params=params, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            results = self.parse_response(data)
         except Exception:
             return list(DUMMY_REPORTS)
 
         return results if results else list(DUMMY_REPORTS)
+
+    def parse_response(self, data):
+        """Parse ReliefWeb API response into list of report dicts."""
+        results = []
+        items = data.get("data", [])
+        for item in items:
+            fields = item.get("fields", {})
+            lang_list = fields.get("language", [{}])
+            lang_code = lang_list[0].get("code", "en") if lang_list else "en"
+            date_val = fields.get("date", {})
+            date_str = (
+                date_val.get("created", "") if isinstance(date_val, dict) else str(date_val)
+            )
+            results.append({
+                "title": fields.get("title", ""),
+                "url": fields.get("url_alias", ""),
+                "date": date_str,
+                "language": lang_code,
+                "summary": (fields.get("body", "") or "")[:200],
+            })
+        return results
 
     def fetch_images_from_report(self, report_url):
         """Fetch image URLs from a report page. Returns empty list on failure."""
